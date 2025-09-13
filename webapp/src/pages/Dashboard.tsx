@@ -142,7 +142,7 @@ const Dashboard: React.FC = () => {
             setores e promoções. Use a navegação lateral para acessar as diferentes funcionalidades.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Funcionalidades disponíveis:
+            Funcionalidades:
           </Typography>
           <Box component="ul" sx={{ mt: 1, pl: 2 }}>
             <Typography component="li" variant="body2">
