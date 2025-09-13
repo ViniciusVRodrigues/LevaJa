@@ -177,11 +177,14 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
         <Box
           component="img"
           sx={{
-            height: 40,
+            maxHeight: "80px",
+            maxWidth: '200px',
             width: 'auto',
+            height: 'auto',
+            objectFit: 'contain',
           }}
           alt="LevaJá Logo"
-          src="/logo.png"
+          src="/levaja.png"
         />
       </Box>
     </Box>
