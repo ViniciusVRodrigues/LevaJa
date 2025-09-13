@@ -26,6 +26,7 @@ const Layout: React.FC = () => {
           flexGrow: 1,
           backgroundColor: 'background.default',
           minHeight: '100vh',
+          marginLeft: { lg: '240px' },
           width: { lg: `calc(100% - 240px)` },
         }}
       >
