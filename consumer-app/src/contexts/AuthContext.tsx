@@ -135,11 +135,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (response.success) {
         dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.user });
+        return; // Successful login
       } else {
-        dispatch({ type: 'LOGIN_FAILURE', payload: response.message || 'Erro no login' });
+        const errorMessage = response.message || 'Erro no login';
+        dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
+        throw new Error(errorMessage);
       }
     } catch (error) {
-      dispatch({ type: 'LOGIN_FAILURE', payload: 'Erro de conexão. Tente novamente.' });
+      const errorMessage = error instanceof Error ? error.message : 'Erro de conexão. Tente novamente.';
+      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
+      throw error;
     }
   };
 

@@ -71,7 +71,8 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(formData);
-      // Navigation will be handled by the useEffect above
+      // Force navigation after successful login
+      navigate('/', { replace: true });
     } catch (error) {
       // Error handling is done in the auth context
     }
