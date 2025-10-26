@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userRoutes = require('./userRoutes');
 const productRoutes = require('./productRoutes');
+const azureRoutes = require('./azureRoutes');
 
 /**
  * Configuração central de rotas
@@ -22,5 +23,8 @@ router.use('/usuarios', userRoutes);
 
 // Rotas de lotes de produtos
 router.use('/lotes-produtos', productRoutes);
+
+// Rotas de integração com Azure
+router.use('/azure', azureRoutes);
 
 module.exports = router;

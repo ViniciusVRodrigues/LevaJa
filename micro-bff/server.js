@@ -5,6 +5,7 @@ const config = require('./config');
 const logger = require('./middleware/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const routes = require('./routes');
+const serviceBusService = require('./services/serviceBusService');
 
 /**
  * Servidor Express.js - BFF (Backend for Frontend) API Gateway
@@ -40,7 +41,8 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/v1/health',
       usuarios: '/api/v1/usuarios',
-      lotesProdutos: '/api/v1/lotes-produtos'
+      lotesProdutos: '/api/v1/lotes-produtos',
+      azure: '/api/v1/azure'
     },
     documentation: '/swagger.yaml'
   });
@@ -59,7 +61,7 @@ app.use(errorHandler);
 // ========== Inicialização do Servidor ==========
 const PORT = config.port;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -71,28 +73,38 @@ const server = app.listen(PORT, () => {
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
+
+  // Inicializa Service Bus (opcional - não bloqueia o servidor se falhar)
+  try {
+    await serviceBusService.initialize();
+  } catch (error) {
+    console.warn('Service Bus initialization failed (not critical):', error.message);
+  }
 });
 
 // Tratamento de erros não capturados
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
-  server.close(() => {
+  server.close(async () => {
+    await serviceBusService.close();
     process.exit(1);
   });
 });
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
-  server.close(() => {
+  server.close(async () => {
+    await serviceBusService.close();
     process.exit(1);
   });
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
+  server.close(async () => {
     console.log('HTTP server closed');
+    await serviceBusService.close();
   });
 });
 

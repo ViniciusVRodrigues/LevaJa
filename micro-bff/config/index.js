@@ -27,6 +27,23 @@ const config = {
     allowedHeaders: ['Content-Type', 'Authorization']
   },
   
+  // Configurações do Azure
+  azure: {
+    // Azure Functions
+    functions: {
+      function1Url: process.env.AZURE_FUNCTION1_URL,
+      function1Key: process.env.AZURE_FUNCTION1_KEY,
+      function2Url: process.env.AZURE_FUNCTION2_URL,
+      function2Key: process.env.AZURE_FUNCTION2_KEY,
+      timeout: parseInt(process.env.AZURE_FUNCTION_TIMEOUT) || 10000
+    },
+    // Azure Service Bus
+    serviceBus: {
+      connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION_STRING,
+      queueName: process.env.AZURE_SERVICE_BUS_QUEUE_NAME || 'default-queue'
+    }
+  },
+  
   logLevel: process.env.LOG_LEVEL || 'info'
 };
 
