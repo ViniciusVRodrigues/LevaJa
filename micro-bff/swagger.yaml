@@ -1,0 +1,575 @@
+openapi: 3.0.3
+info:
+  title: API de Gestão de Usuários e Produtos
+  description: |
+    API para gerenciamento de usuários e lotes de produtos.
+    Desenvolvida como parte do projeto PJBL de Arquitetura Cloud.
+  version: 1.0.0
+  contact:
+    name: Equipe de Desenvolvimento
+    email: contato@exemplo.com
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Servidor de Desenvolvimento
+  - url: https://api.exemplo.com/v1
+    description: Servidor de Produção
+
+tags:
+  - name: Usuários
+    description: Operações relacionadas a usuários
+  - name: Lotes de Produtos
+    description: Operações relacionadas a lotes de produtos
+
+paths:
+  /usuarios:
+    get:
+      tags:
+        - Usuários
+      summary: Listar todos os usuários
+      description: Retorna uma lista paginada de usuários
+      parameters:
+        - name: limit
+          in: query
+          description: Número máximo de registros por página
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Número de registros a pular
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Lista de usuários retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Usuario'
+                  total:
+                    type: integer
+                    example: 50
+                  limit:
+                    type: integer
+                    example: 10
+                  offset:
+                    type: integer
+                    example: 0
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    post:
+      tags:
+        - Usuários
+      summary: Criar novo usuário
+      description: Cria um novo usuário no sistema
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioInput'
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /usuarios/{id}:
+    get:
+      tags:
+        - Usuários
+      summary: Buscar usuário por ID
+      description: Retorna um usuário específico pelo ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do usuário
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        '200':
+          description: Usuário encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    put:
+      tags:
+        - Usuários
+      summary: Atualizar usuário
+      description: Atualiza os dados de um usuário existente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do usuário
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioInput'
+      responses:
+        '200':
+          description: Usuário atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      tags:
+        - Usuários
+      summary: Deletar usuário
+      description: Remove um usuário do sistema
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do usuário
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        '204':
+          description: Usuário deletado com sucesso
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /lotes-produtos:
+    get:
+      tags:
+        - Lotes de Produtos
+      summary: Listar todos os lotes de produtos
+      description: Retorna uma lista paginada de lotes de produtos
+      parameters:
+        - name: limit
+          in: query
+          description: Número máximo de registros por página
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Número de registros a pular
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: categoria
+          in: query
+          description: Filtrar por categoria
+          schema:
+            type: string
+            example: "Alimentos"
+      responses:
+        '200':
+          description: Lista de lotes de produtos retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoteProduto'
+                  total:
+                    type: integer
+                    example: 120
+                  limit:
+                    type: integer
+                    example: 10
+                  offset:
+                    type: integer
+                    example: 0
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    post:
+      tags:
+        - Lotes de Produtos
+      summary: Criar novo lote de produto
+      description: Cria um novo lote de produto no sistema
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoteProdutoInput'
+      responses:
+        '201':
+          description: Lote de produto criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /lotes-produtos/{id}:
+    get:
+      tags:
+        - Lotes de Produtos
+      summary: Buscar lote de produto por ID
+      description: Retorna um lote de produto específico pelo ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do lote de produto
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        '200':
+          description: Lote de produto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    put:
+      tags:
+        - Lotes de Produtos
+      summary: Atualizar lote de produto
+      description: Atualiza os dados de um lote de produto existente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do lote de produto
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoteProdutoInput'
+      responses:
+        '200':
+          description: Lote de produto atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      tags:
+        - Lotes de Produtos
+      summary: Deletar lote de produto
+      description: Remove um lote de produto do sistema
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do lote de produto
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      responses:
+        '204':
+          description: Lote de produto deletado com sucesso
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /lotes-produtos/{id}/estoque:
+    patch:
+      tags:
+        - Lotes de Produtos
+      summary: Atualizar estoque do lote
+      description: Atualiza apenas a quantidade em estoque de um lote de produto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do lote de produto
+          schema:
+            type: string
+            example: "507f1f77bcf86cd799439011"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - estoque
+              properties:
+                estoque:
+                  type: integer
+                  minimum: 0
+                  example: 150
+      responses:
+        '200':
+          description: Estoque atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    Usuario:
+      type: object
+      required:
+        - id
+        - nome
+        - email
+      properties:
+        id:
+          type: string
+          description: Identificador único do usuário
+          example: "507f1f77bcf86cd799439011"
+        nome:
+          type: string
+          description: Nome completo do usuário
+          minLength: 3
+          maxLength: 100
+          example: "João Silva"
+        email:
+          type: string
+          format: email
+          description: Email do usuário
+          example: "joao.silva@exemplo.com"
+        senha:
+          type: string
+          format: password
+          description: Senha do usuário (retornada apenas em casos específicos)
+          writeOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Data de criação do registro
+          readOnly: true
+          example: "2025-10-26T15:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Data da última atualização
+          readOnly: true
+          example: "2025-10-26T15:30:00Z"
+
+    UsuarioInput:
+      type: object
+      required:
+        - nome
+        - email
+        - senha
+      properties:
+        nome:
+          type: string
+          description: Nome completo do usuário
+          minLength: 3
+          maxLength: 100
+          example: "João Silva"
+        email:
+          type: string
+          format: email
+          description: Email do usuário
+          example: "joao.silva@exemplo.com"
+        senha:
+          type: string
+          format: password
+          description: Senha do usuário
+          minLength: 8
+          example: "SenhaSegura123!"
+
+    LoteProduto:
+      type: object
+      required:
+        - id
+        - nome
+        - categoria
+        - estoque
+        - valor
+      properties:
+        id:
+          type: string
+          description: Identificador único do lote de produto
+          example: "507f1f77bcf86cd799439011"
+        nome:
+          type: string
+          description: Nome do produto
+          minLength: 3
+          maxLength: 150
+          example: "Arroz Integral 1kg"
+        categoria:
+          type: string
+          description: Categoria do produto
+          example: "Alimentos"
+        estoque:
+          type: integer
+          description: Quantidade disponível em estoque
+          minimum: 0
+          example: 500
+        validade:
+          type: string
+          format: date
+          description: Data de validade do lote
+          example: "2026-12-31"
+        valor:
+          type: number
+          format: double
+          description: Valor unitário do produto em reais
+          minimum: 0
+          example: 15.99
+        createdAt:
+          type: string
+          format: date-time
+          description: Data de criação do registro
+          readOnly: true
+          example: "2025-10-26T15:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Data da última atualização
+          readOnly: true
+          example: "2025-10-26T15:30:00Z"
+
+    LoteProdutoInput:
+      type: object
+      required:
+        - nome
+        - categoria
+        - estoque
+        - valor
+      properties:
+        nome:
+          type: string
+          description: Nome do produto
+          minLength: 3
+          maxLength: 150
+          example: "Arroz Integral 1kg"
+        categoria:
+          type: string
+          description: Categoria do produto
+          example: "Alimentos"
+        estoque:
+          type: integer
+          description: Quantidade disponível em estoque
+          minimum: 0
+          example: 500
+        validade:
+          type: string
+          format: date
+          description: Data de validade do lote (opcional)
+          example: "2026-12-31"
+        valor:
+          type: number
+          format: double
+          description: Valor unitário do produto em reais
+          minimum: 0
+          example: 15.99
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Mensagem de erro
+          example: "Erro ao processar requisição"
+        code:
+          type: string
+          description: Código do erro
+          example: "ERR_VALIDATION"
+        details:
+          type: array
+          description: Detalhes adicionais do erro
+          items:
+            type: string
+
+  responses:
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Dados inválidos na requisição"
+            code: "BAD_REQUEST"
+            details:
+              - "O campo 'email' é obrigatório"
+              - "O campo 'estoque' deve ser maior ou igual a 0"
+
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Recurso não encontrado"
+            code: "NOT_FOUND"
+
+    InternalServerError:
+      description: Erro interno do servidor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: "Erro interno do servidor"
+            code: "INTERNAL_ERROR"
