@@ -18,52 +18,76 @@ class ProductService {
    * Lista todos os lotes de produtos com paginação
    */
   async getProducts(limit = 10, offset = 0, categoria = null) {
-    const params = { limit, offset };
-    if (categoria) {
-      params.categoria = categoria;
+    try {
+      const params = { limit, offset };
+      if (categoria) {
+        params.categoria = categoria;
+      }
+      const response = await productServiceClient.get('/lotes-produtos', { params });
+      return response.data;
+    } catch (error) {
+      throw error;
     }
-    const response = await productServiceClient.get('/lotes-produtos', { params });
-    return response.data;
   }
 
   /**
    * Busca um lote de produto por ID
    */
   async getProductById(id) {
-    const response = await productServiceClient.get(`/lotes-produtos/${id}`);
-    return response.data;
+    try {
+      const response = await productServiceClient.get(`/lotes-produtos/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
    * Cria um novo lote de produto
    */
   async createProduct(productData) {
-    const response = await productServiceClient.post('/lotes-produtos', productData);
-    return response.data;
+    try {
+      const response = await productServiceClient.post('/lotes-produtos', productData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
    * Atualiza um lote de produto existente
    */
   async updateProduct(id, productData) {
-    const response = await productServiceClient.put(`/lotes-produtos/${id}`, productData);
-    return response.data;
+    try {
+      const response = await productServiceClient.put(`/lotes-produtos/${id}`, productData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
    * Deleta um lote de produto
    */
   async deleteProduct(id) {
-    const response = await productServiceClient.delete(`/lotes-produtos/${id}`);
-    return response.data;
+    try {
+      const response = await productServiceClient.delete(`/lotes-produtos/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
    * Atualiza o estoque de um lote de produto
    */
   async updateStock(id, estoque) {
-    const response = await productServiceClient.patch(`/lotes-produtos/${id}/estoque`, { estoque });
-    return response.data;
+    try {
+      const response = await productServiceClient.patch(`/lotes-produtos/${id}/estoque`, { estoque });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 }
 

@@ -5,6 +5,61 @@ const { AppError } = require('../middleware/errorHandler');
  * Controller para lógica de negócio relacionada a lotes de produtos
  */
 
+/**
+ * Validação de dados de produto
+ */
+function validateProductData(productData) {
+  const errors = [];
+
+  // Validação de campos obrigatórios
+  if (!productData.nome) {
+    errors.push('O campo nome é obrigatório');
+  }
+  if (!productData.categoria) {
+    errors.push('O campo categoria é obrigatório');
+  }
+  if (productData.estoque === undefined || productData.estoque === null) {
+    errors.push('O campo estoque é obrigatório');
+  }
+  if (productData.valor === undefined || productData.valor === null) {
+    errors.push('O campo valor é obrigatório');
+  }
+
+  if (errors.length > 0) {
+    throw new AppError('Campos obrigatórios faltando', 400, 'BAD_REQUEST', errors);
+  }
+
+  // Validação de tamanho do nome
+  if (productData.nome.length < 3 || productData.nome.length > 150) {
+    throw new AppError(
+      'Nome inválido',
+      400,
+      'BAD_REQUEST',
+      ['O nome deve ter entre 3 e 150 caracteres']
+    );
+  }
+
+  // Validação de estoque
+  if (typeof productData.estoque !== 'number' || productData.estoque < 0) {
+    throw new AppError(
+      'Estoque inválido',
+      400,
+      'BAD_REQUEST',
+      ['O estoque deve ser um número maior ou igual a 0']
+    );
+  }
+
+  // Validação de valor
+  if (typeof productData.valor !== 'number' || productData.valor < 0) {
+    throw new AppError(
+      'Valor inválido',
+      400,
+      'BAD_REQUEST',
+      ['O valor deve ser um número maior ou igual a 0']
+    );
+  }
+}
+
 class ProductController {
   /**
    * Lista todos os lotes de produtos
@@ -50,45 +105,8 @@ class ProductController {
     try {
       const productData = req.body;
 
-      // Validação básica dos campos obrigatórios
-      if (!productData.nome || !productData.categoria || productData.estoque === undefined || !productData.valor) {
-        throw new AppError(
-          'Campos obrigatórios faltando',
-          400,
-          'BAD_REQUEST',
-          ['Os campos nome, categoria, estoque e valor são obrigatórios']
-        );
-      }
-
-      // Validação de tamanho do nome
-      if (productData.nome.length < 3 || productData.nome.length > 150) {
-        throw new AppError(
-          'Nome inválido',
-          400,
-          'BAD_REQUEST',
-          ['O nome deve ter entre 3 e 150 caracteres']
-        );
-      }
-
-      // Validação de estoque
-      if (typeof productData.estoque !== 'number' || productData.estoque < 0) {
-        throw new AppError(
-          'Estoque inválido',
-          400,
-          'BAD_REQUEST',
-          ['O estoque deve ser um número maior ou igual a 0']
-        );
-      }
-
-      // Validação de valor
-      if (typeof productData.valor !== 'number' || productData.valor < 0) {
-        throw new AppError(
-          'Valor inválido',
-          400,
-          'BAD_REQUEST',
-          ['O valor deve ser um número maior ou igual a 0']
-        );
-      }
+      // Validação de dados
+      validateProductData(productData);
 
       const data = await productService.createProduct(productData);
       res.status(201).json(data);
@@ -105,45 +123,8 @@ class ProductController {
       const { id } = req.params;
       const productData = req.body;
 
-      // Validação básica dos campos obrigatórios
-      if (!productData.nome || !productData.categoria || productData.estoque === undefined || !productData.valor) {
-        throw new AppError(
-          'Campos obrigatórios faltando',
-          400,
-          'BAD_REQUEST',
-          ['Os campos nome, categoria, estoque e valor são obrigatórios']
-        );
-      }
-
-      // Validação de tamanho do nome
-      if (productData.nome.length < 3 || productData.nome.length > 150) {
-        throw new AppError(
-          'Nome inválido',
-          400,
-          'BAD_REQUEST',
-          ['O nome deve ter entre 3 e 150 caracteres']
-        );
-      }
-
-      // Validação de estoque
-      if (typeof productData.estoque !== 'number' || productData.estoque < 0) {
-        throw new AppError(
-          'Estoque inválido',
-          400,
-          'BAD_REQUEST',
-          ['O estoque deve ser um número maior ou igual a 0']
-        );
-      }
-
-      // Validação de valor
-      if (typeof productData.valor !== 'number' || productData.valor < 0) {
-        throw new AppError(
-          'Valor inválido',
-          400,
-          'BAD_REQUEST',
-          ['O valor deve ser um número maior ou igual a 0']
-        );
-      }
+      // Validação de dados
+      validateProductData(productData);
 
       const data = await productService.updateProduct(id, productData);
       res.json(data);
