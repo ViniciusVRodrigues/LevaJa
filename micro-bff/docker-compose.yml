@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: micro-bff
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - USER_SERVICE_URL=${USER_SERVICE_URL:-http://host.docker.internal:3001}
+      - PRODUCT_SERVICE_URL=${PRODUCT_SERVICE_URL:-http://host.docker.internal:3002}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:4200}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-5000}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
