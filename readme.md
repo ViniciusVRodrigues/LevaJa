@@ -1,5 +1,9 @@
 Sistema LevaJá
 
-WEBAPP Administrativo
-
-Site/Aplicativo para Consumidores
+Pastas/Implementações
+mfe-admin
+micro-bff
+micro-azure
+function-azure
+micro-mongo
+function-mongo
