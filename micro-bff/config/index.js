@@ -16,7 +16,13 @@ const config = {
   },
   
   cors: {
-    origin: process.env.CORS_ORIGIN || '*',
+    // Permite múltiplas origens separadas por vírgula
+    // Em desenvolvimento, pode usar '*', mas em produção deve especificar domínios
+    origin: process.env.CORS_ORIGIN 
+      ? (process.env.CORS_ORIGIN === '*' 
+          ? '*' 
+          : process.env.CORS_ORIGIN.split(',').map(o => o.trim()))
+      : 'http://localhost:4200',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
   },

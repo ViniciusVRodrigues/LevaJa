@@ -5,6 +5,18 @@ const { AppError } = require('../middleware/errorHandler');
  * Controller para lógica de negócio relacionada a lotes de produtos
  */
 
+// Regex de validação de ID (formato MongoDB ObjectId)
+const ID_REGEX = /^[a-fA-F0-9]{24}$/;
+
+/**
+ * Valida formato de ID
+ */
+function validateId(id) {
+  if (!ID_REGEX.test(id)) {
+    throw new AppError('ID inválido', 400, 'BAD_REQUEST', ['O ID deve ser um ObjectId válido']);
+  }
+}
+
 /**
  * Validação de dados de produto
  */
@@ -91,6 +103,7 @@ class ProductController {
   async getProductById(req, res, next) {
     try {
       const { id } = req.params;
+      validateId(id);
       const data = await productService.getProductById(id);
       res.json(data);
     } catch (error) {
@@ -121,6 +134,7 @@ class ProductController {
   async updateProduct(req, res, next) {
     try {
       const { id } = req.params;
+      validateId(id);
       const productData = req.body;
 
       // Validação de dados
@@ -139,6 +153,7 @@ class ProductController {
   async deleteProduct(req, res, next) {
     try {
       const { id } = req.params;
+      validateId(id);
       await productService.deleteProduct(id);
       res.status(204).send();
     } catch (error) {
@@ -152,6 +167,7 @@ class ProductController {
   async updateStock(req, res, next) {
     try {
       const { id } = req.params;
+      validateId(id);
       const { estoque } = req.body;
 
       // Validação do campo estoque
