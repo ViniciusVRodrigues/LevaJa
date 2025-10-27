@@ -1,4 +1,5 @@
 const userService = require('../services/userService');
+const serviceBusService = require('../services/serviceBusService');
 const { AppError } = require('../middleware/errorHandler');
 
 /**
@@ -122,6 +123,24 @@ class UserController {
       validateUserData(userData);
 
       const data = await userService.createUser(userData);
+
+      // Envia evento para Service Bus (criação via evento)
+      try {
+        await serviceBusService.sendMessage('usuario-criado', {
+          eventType: 'UsuarioCriado',
+          timestamp: new Date().toISOString(),
+          data: {
+            usuarioId: data.id || data._id || data.insertedId,
+            nome: userData.nome,
+            email: userData.email
+          }
+        });
+        console.log('Evento UsuarioCriado enviado para Service Bus');
+      } catch (busError) {
+        // Não falha a criação se o Service Bus não estiver configurado
+        console.warn('Não foi possível enviar evento para Service Bus:', busError.message);
+      }
+
       res.status(201).json(data);
     } catch (error) {
       next(error);

@@ -56,7 +56,7 @@ class AzureController {
    */
   async sendMessage(req, res, next) {
     try {
-      const { message } = req.body;
+      const { message, queueName } = req.body;
 
       if (!message) {
         throw new AppError(
@@ -67,12 +67,12 @@ class AzureController {
         );
       }
 
-      // Envia mensagem para o Service Bus
-      const result = await serviceBusService.sendMessage(message);
+      // Envia mensagem para o Service Bus (usa fila padrão se não especificado)
+      const result = await serviceBusService.sendMessage(queueName, message);
 
       res.json({
         success: true,
-        message: 'Mensagem enviada para Service Bus',
+        message: `Mensagem enviada para Service Bus${queueName ? ` (fila: ${queueName})` : ''}`,
         result
       });
     } catch (error) {
@@ -86,7 +86,7 @@ class AzureController {
    */
   async sendBatchMessages(req, res, next) {
     try {
-      const { messages } = req.body;
+      const { messages, queueName } = req.body;
 
       if (!messages || !Array.isArray(messages) || messages.length === 0) {
         throw new AppError(
@@ -98,11 +98,11 @@ class AzureController {
       }
 
       // Envia mensagens em lote para o Service Bus
-      const result = await serviceBusService.sendBatchMessages(messages);
+      const result = await serviceBusService.sendBatchMessages(queueName, messages);
 
       res.json({
         success: true,
-        message: `${messages.length} mensagens enviadas para Service Bus`,
+        message: `${messages.length} mensagens enviadas para Service Bus${queueName ? ` (fila: ${queueName})` : ''}`,
         result
       });
     } catch (error) {

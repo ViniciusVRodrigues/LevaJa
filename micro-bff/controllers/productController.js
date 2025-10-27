@@ -1,4 +1,5 @@
 const productService = require('../services/productService');
+const serviceBusService = require('../services/serviceBusService');
 const { AppError } = require('../middleware/errorHandler');
 
 /**
@@ -122,6 +123,27 @@ class ProductController {
       validateProductData(productData);
 
       const data = await productService.createProduct(productData);
+
+      // Envia evento para Service Bus (criação via evento)
+      try {
+        await serviceBusService.sendMessage('lote-criado', {
+          eventType: 'LoteCriado',
+          timestamp: new Date().toISOString(),
+          data: {
+            loteId: data.id || data._id || data.insertedId,
+            nome: productData.nome,
+            categoria: productData.categoria,
+            estoque: productData.estoque,
+            validade: productData.validade || null,
+            valor: productData.valor
+          }
+        });
+        console.log('Evento LoteCriado enviado para Service Bus');
+      } catch (busError) {
+        // Não falha a criação se o Service Bus não estiver configurado
+        console.warn('Não foi possível enviar evento para Service Bus:', busError.message);
+      }
+
       res.status(201).json(data);
     } catch (error) {
       next(error);
