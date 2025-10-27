@@ -40,6 +40,10 @@ const config = {
     // Azure Service Bus
     serviceBus: {
       connectionString: process.env.AZURE_SERVICE_BUS_CONNECTION_STRING,
+      // Filas específicas para cada tipo de evento
+      userQueue: process.env.AZURE_SERVICE_BUS_USER_QUEUE || 'usuario-criado',
+      productQueue: process.env.AZURE_SERVICE_BUS_PRODUCT_QUEUE || 'lote-criado',
+      // Fila padrão para operações genéricas
       queueName: process.env.AZURE_SERVICE_BUS_QUEUE_NAME || 'default-queue'
     }
   },

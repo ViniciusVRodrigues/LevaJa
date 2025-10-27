@@ -1,5 +1,6 @@
 const productService = require('../services/productService');
 const serviceBusService = require('../services/serviceBusService');
+const config = require('../config');
 const { AppError } = require('../middleware/errorHandler');
 
 /**
@@ -126,7 +127,7 @@ class ProductController {
 
       // Envia evento para Service Bus (criação via evento)
       try {
-        await serviceBusService.sendMessage('lote-criado', {
+        await serviceBusService.sendMessage(config.azure.serviceBus.productQueue, {
           eventType: 'LoteCriado',
           timestamp: new Date().toISOString(),
           data: {
@@ -138,7 +139,7 @@ class ProductController {
             valor: productData.valor
           }
         });
-        console.log('Evento LoteCriado enviado para Service Bus');
+        console.log(`Evento LoteCriado enviado para Service Bus fila '${config.azure.serviceBus.productQueue}'`);
       } catch (busError) {
         // Não falha a criação se o Service Bus não estiver configurado
         console.warn('Não foi possível enviar evento para Service Bus:', busError.message);

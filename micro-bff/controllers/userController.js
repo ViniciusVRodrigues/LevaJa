@@ -1,5 +1,6 @@
 const userService = require('../services/userService');
 const serviceBusService = require('../services/serviceBusService');
+const config = require('../config');
 const { AppError } = require('../middleware/errorHandler');
 
 /**
@@ -126,7 +127,7 @@ class UserController {
 
       // Envia evento para Service Bus (criação via evento)
       try {
-        await serviceBusService.sendMessage('usuario-criado', {
+        await serviceBusService.sendMessage(config.azure.serviceBus.userQueue, {
           eventType: 'UsuarioCriado',
           timestamp: new Date().toISOString(),
           data: {
@@ -135,7 +136,7 @@ class UserController {
             email: userData.email
           }
         });
-        console.log('Evento UsuarioCriado enviado para Service Bus');
+        console.log(`Evento UsuarioCriado enviado para Service Bus fila '${config.azure.serviceBus.userQueue}'`);
       } catch (busError) {
         // Não falha a criação se o Service Bus não estiver configurado
         console.warn('Não foi possível enviar evento para Service Bus:', busError.message);
