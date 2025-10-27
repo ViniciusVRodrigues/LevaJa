@@ -49,8 +49,8 @@ function Dashboard() {
           <div className="stat-label">Total de Usuários</div>
           {data?.userStatistics && (
             <div className="stat-details">
-              <p>Criados via eventos: {data.userStatistics.totalCreated || 0}</p>
-              <p>Criados hoje: {data.userStatistics.createdToday || 0}</p>
+              <p>Criados via eventos: {data.userStatistics.statistics.totalUsuariosCriados || 0}</p>
+              <p>Criados hoje: {data.userStatistics.statistics.usuariosCriadosHoje || 0}</p>
             </div>
           )}
         </div>
