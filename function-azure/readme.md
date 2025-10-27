@@ -1,1 +1,0 @@
-Função Azure SQL Server

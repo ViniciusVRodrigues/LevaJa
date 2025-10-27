@@ -1,1 +1,0 @@
-Micro Frontend do Admin

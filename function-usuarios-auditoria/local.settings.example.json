@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "MONGODB_URI": "mongodb://localhost:27017/auditoria",
+    "SERVICE_BUS_CONNECTION": "Endpoint=sb://your-servicebus.servicebus.windows.net/;SharedAccessKeyName=..."
+  }
+}
