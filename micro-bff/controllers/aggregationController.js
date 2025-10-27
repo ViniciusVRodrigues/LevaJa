@@ -17,7 +17,7 @@ class AggregationController {
       const { limit = 10, offset = 0 } = req.query;
 
       // Busca usuários do microserviço
-      const usersResponse = await userService.getUsers({ limit, offset });
+      const usersResponse = await userService.getUsers(limit, offset);
 
       // Tenta buscar estatísticas de auditoria da function
       let auditStats = null;
@@ -99,7 +99,7 @@ class AggregationController {
   async getDashboard(req, res, next) {
     try {
       // Busca resumo de usuários
-      const usersResponse = await userService.getAll({ limit: 5, offset: 0 });
+      const usersResponse = await userService.getUsers(5, 0);
 
       // Busca resumo de produtos
       const productsResponse = await productService.getAll({ limit: 5, offset: 0 });
