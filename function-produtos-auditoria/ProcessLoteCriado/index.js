@@ -6,7 +6,7 @@ module.exports = async function (context, message) {
 
         // Validar estrutura do evento
         if (!message || !message.eventType || message.eventType !== 'LoteCriado') {
-            context.log.error('Invalid event structure:', message);
+            context.log.error('Invalid event structure:', JSON.stringify(message));
             return;
         }
 
@@ -71,7 +71,11 @@ module.exports = async function (context, message) {
 
         context.log('Event processed successfully');
     } catch (error) {
-        context.log.error('Error processing lote-criado event:', error);
+        context.log.error('Error processing lote-criado event:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         throw error; // Rethrow para retry do Service Bus
     }
 };

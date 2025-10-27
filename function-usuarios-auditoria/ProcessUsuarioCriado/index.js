@@ -6,11 +6,18 @@ module.exports = async function (context, message) {
 
         // Validar estrutura do evento
         if (!message || !message.eventType || message.eventType !== 'UsuarioCriado') {
-            context.log.error('Invalid event structure:', message);
+            context.log('Invalid event structure:', JSON.stringify(message));
             return;
         }
 
         const { timestamp, data } = message;
+        
+        // Validar se data existe
+        if (!data) {
+            context.log('Event data is missing:', JSON.stringify(message));
+            return;
+        }
+
         const { usuarioId, nome, email } = data;
 
         // Conectar ao MongoDB
@@ -34,7 +41,11 @@ module.exports = async function (context, message) {
 
         context.log('Event processed successfully');
     } catch (error) {
-        context.log.error('Error processing usuario-criado event:', error);
+        // Garantir que o erro seja logado corretamente
+        const errorMessage = error && error.message ? error.message : 'Unknown error';
+        const errorStack = error && error.stack ? error.stack : 'No stack trace';
+        context.log(`Error processing usuario-criado event: ${errorMessage}`);
+        context.log(`Stack trace: ${errorStack}`);
         throw error;
     }
 };

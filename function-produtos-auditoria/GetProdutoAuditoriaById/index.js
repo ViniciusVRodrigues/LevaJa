@@ -1,57 +1,53 @@
-const { app } = require('@azure/functions');
 const { getPool } = require('../config/database');
 
-app.http('GetProdutoAuditoriaById', {
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  route: 'produtos-auditoria/{id}',
-  handler: async (request, context) => {
+module.exports = async function (context, req) {
     try {
-      const id = parseInt(request.params.id);
-      
-      if (isNaN(id)) {
-        return {
-          status: 400,
-          jsonBody: {
-            success: false,
-            message: 'ID inválido'
-          }
-        };
-      }
-
-      const pool = await getPool();
-
-      const result = await pool.request()
-        .input('id', id)
-        .query('SELECT * FROM produtos_auditoria WHERE id = @id');
-
-      if (result.recordset.length === 0) {
-        return {
-          status: 404,
-          jsonBody: {
-            success: false,
-            message: 'Auditoria não encontrada'
-          }
-        };
-      }
-
-      return {
-        status: 200,
-        jsonBody: {
-          success: true,
-          data: result.recordset[0]
+        const id = parseInt(context.bindingData.id);
+        
+        if (isNaN(id)) {
+            context.res = {
+                status: 400,
+                body: {
+                    success: false,
+                    message: 'ID inválido'
+                }
+            };
+            return;
         }
-      };
+
+        const pool = await getPool();
+
+        const result = await pool.request()
+            .input('id', id)
+            .query('SELECT * FROM produtos_auditoria WHERE id = @id');
+
+        if (result.recordset.length === 0) {
+            context.res = {
+                status: 404,
+                body: {
+                    success: false,
+                    message: 'Auditoria não encontrada'
+                }
+            };
+            return;
+        }
+
+        context.res = {
+            status: 200,
+            body: {
+                success: true,
+                data: result.recordset[0]
+            }
+        };
     } catch (error) {
-      context.error('Error in GetProdutoAuditoriaById:', error);
-      return {
-        status: 500,
-        jsonBody: {
-          success: false,
-          message: 'Erro ao buscar auditoria',
-          error: error.message
-        }
-      };
+        context.log.error('Error in GetProdutoAuditoriaById:', error);
+        context.res = {
+            status: 500,
+            body: {
+                success: false,
+                message: 'Erro ao buscar auditoria',
+                error: error.message
+            }
+        };
     }
-  }
-});
+};
