@@ -49,6 +49,12 @@ class UserController {
   async getById(req, res) {
     try {
       const { id } = req.params;
+      
+      // Validate if ID is a valid integer
+      if (isNaN(parseInt(id))) {
+        return res.status(400).json({ error: 'ID inválido - deve ser um número inteiro' });
+      }
+
       const pool = getPool();
 
       const result = await pool.request()
@@ -115,6 +121,11 @@ class UserController {
       const { id } = req.params;
       const { nome, email, senha } = req.body;
 
+      // Validate if ID is a valid integer
+      if (isNaN(parseInt(id))) {
+        return res.status(400).json({ error: 'ID inválido - deve ser um número inteiro' });
+      }
+
       const pool = getPool();
 
       // Verifica se usuário existe
@@ -160,6 +171,12 @@ class UserController {
   async delete(req, res) {
     try {
       const { id } = req.params;
+      
+      // Validate if ID is a valid integer
+      if (isNaN(parseInt(id))) {
+        return res.status(400).json({ error: 'ID inválido - deve ser um número inteiro' });
+      }
+
       const pool = getPool();
 
       // Verifica se usuário existe

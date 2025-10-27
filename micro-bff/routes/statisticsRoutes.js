@@ -115,7 +115,11 @@ router.get('/relatorios/estoque-baixo', async (req, res, next) => {
       params: { limit }
     });
 
-    res.json(result);
+    // Normaliza a resposta para retornar array direto
+    // A Azure Function retorna { produtos: [], alertas: [], ... }
+    // Mas o frontend espera apenas o array de produtos
+    const produtos = Array.isArray(result?.produtos) ? result.produtos : [];
+    res.json(produtos);
   } catch (error) {
     next(error);
   }
@@ -135,7 +139,11 @@ router.get('/relatorios/vencimentos-proximos', async (req, res, next) => {
       params: { limit }
     });
 
-    res.json(result);
+    // Normaliza a resposta para retornar array direto
+    // A Azure Function retorna { produtosProximos: [], produtosVencidos: [], ... }
+    // O frontend espera apenas o array de produtos próximos
+    const produtos = Array.isArray(result?.produtosProximos) ? result.produtosProximos : [];
+    res.json(produtos);
   } catch (error) {
     next(error);
   }

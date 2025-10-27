@@ -22,11 +22,15 @@ function Reports() {
         getLowStockReport({ limit: 50 }),
         getNearExpirationReport({ limit: 50 })
       ]);
-      setLowStock(lowStockData);
-      setNearExpiration(nearExpirationData);
+      // Ensure we always have arrays, even if the API returns something unexpected
+      setLowStock(Array.isArray(lowStockData) ? lowStockData : []);
+      setNearExpiration(Array.isArray(nearExpirationData) ? nearExpirationData : []);
     } catch (err) {
       setError('Erro ao carregar relatórios');
       console.error('Erro ao carregar relatórios:', err);
+      // Set empty arrays on error to prevent .map() errors
+      setLowStock([]);
+      setNearExpiration([]);
     } finally {
       setLoading(false);
     }
@@ -50,13 +54,13 @@ function Reports() {
           className={`tab ${activeTab === 'lowStock' ? 'active' : ''}`}
           onClick={() => setActiveTab('lowStock')}
         >
-          ⚠️ Estoque Baixo ({lowStock.length})
+          ⚠️ Estoque Baixo ({Array.isArray(lowStock) ? lowStock.length : 0})
         </button>
         <button 
           className={`tab ${activeTab === 'nearExpiration' ? 'active' : ''}`}
           onClick={() => setActiveTab('nearExpiration')}
         >
-          📅 Vencimentos Próximos ({nearExpiration.length})
+          📅 Vencimentos Próximos ({Array.isArray(nearExpiration) ? nearExpiration.length : 0})
         </button>
       </div>
 
@@ -64,7 +68,7 @@ function Reports() {
         {activeTab === 'lowStock' && (
           <div className="report-section">
             <h2>Produtos com Estoque Baixo (≤ 50 unidades)</h2>
-            {lowStock.length === 0 ? (
+            {!Array.isArray(lowStock) || lowStock.length === 0 ? (
               <p className="no-data">✅ Nenhum produto com estoque baixo</p>
             ) : (
               <table className="report-table">
@@ -96,7 +100,7 @@ function Reports() {
         {activeTab === 'nearExpiration' && (
           <div className="report-section">
             <h2>Produtos Próximos do Vencimento (≤ 30 dias)</h2>
-            {nearExpiration.length === 0 ? (
+            {!Array.isArray(nearExpiration) || nearExpiration.length === 0 ? (
               <p className="no-data">✅ Nenhum produto próximo do vencimento</p>
             ) : (
               <table className="report-table">

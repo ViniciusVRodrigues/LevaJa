@@ -43,6 +43,12 @@ class ProductController {
     try {
       const { id } = req.params;
 
+      // Validate if ID is a valid MongoDB ObjectId format
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'ID inválido - formato não suportado' });
+      }
+
       const product = await LoteProduct.findById(id);
 
       if (!product) {
@@ -101,6 +107,12 @@ class ProductController {
       const { id } = req.params;
       const { nome, categoria, estoque, valor, validade } = req.body;
 
+      // Validate if ID is a valid MongoDB ObjectId format
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'ID inválido - formato não suportado' });
+      }
+
       const updateData = {};
       if (nome !== undefined) updateData.nome = nome;
       if (categoria !== undefined) updateData.categoria = categoria;
@@ -143,6 +155,12 @@ class ProductController {
         return res.status(400).json({ error: 'Campo estoque é obrigatório' });
       }
 
+      // Validate if ID is a valid MongoDB ObjectId format
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'ID inválido - formato não suportado' });
+      }
+
       const product = await LoteProduct.findByIdAndUpdate(
         id,
         { estoque },
@@ -169,6 +187,12 @@ class ProductController {
   async delete(req, res) {
     try {
       const { id } = req.params;
+
+      // Validate if ID is a valid MongoDB ObjectId format
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'ID inválido - formato não suportado' });
+      }
 
       const product = await LoteProduct.findByIdAndDelete(id);
 
