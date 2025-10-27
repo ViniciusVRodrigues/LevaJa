@@ -1,58 +1,51 @@
-const { app } = require('@azure/functions');
 const { connectDatabase } = require('../config/database');
 
-app.serviceBusQueue('ProcessUsuarioCriado', {
-  queueName: 'usuario-criado',
-  connection: 'SERVICE_BUS_CONNECTION',
-  handler: async (message, context) => {
+module.exports = async function (context, message) {
     try {
-      context.log('Processing usuario-criado event:', message);
+        context.log('Processing usuario-criado event:', JSON.stringify(message));
 
-      // Validar estrutura do evento
-      if (!message || !message.eventType || message.eventType !== 'UsuarioCriado') {
-        context.error('Invalid event structure:', message);
-        return;
-      }
+        // Validar estrutura do evento
+        if (!message || !message.eventType || message.eventType !== 'UsuarioCriado') {
+            context.log('Invalid event structure:', JSON.stringify(message));
+            return;
+        }
 
-      const { timestamp, data } = message;
-      const { usuarioId, nome, email } = data;
+        const { timestamp, data } = message;
+        
+        // Validar se data existe
+        if (!data) {
+            context.log('Event data is missing:', JSON.stringify(message));
+            return;
+        }
 
-      // Conectar ao MongoDB
-      const db = await connectDatabase();
-      const collection = db.collection('usuarios_auditoria');
+        const { usuarioId, nome, email } = data;
 
-      // Criar registro de auditoria
-      const auditoria = {
-        eventType: 'UsuarioCriado',
-        timestamp: timestamp || new Date().toISOString(),
-        usuarioId,
-        nome,
-        email,
-        processedAt: new Date().toISOString(),
-        originalEvent: message
-      };
+        // Conectar ao MongoDB
+        const db = await connectDatabase();
+        const collection = db.collection('usuarios_auditoria');
 
-      // Inserir no MongoDB
-      const result = await collection.insertOne(auditoria);
-      context.log(`Auditoria registrada com ID: ${result.insertedId}`);
+        // Criar registro de auditoria
+        const auditoria = {
+            eventType: 'UsuarioCriado',
+            timestamp: timestamp || new Date().toISOString(),
+            usuarioId,
+            nome,
+            email,
+            processedAt: new Date().toISOString(),
+            originalEvent: message
+        };
 
-      // Atualizar métricas
-      const metricsCollection = db.collection('metricas');
-      const hoje = new Date().toISOString().split('T')[0];
-      
-      await metricsCollection.updateOne(
-        { data: hoje },
-        {
-          $inc: { totalUsuariosCriados: 1 },
-          $set: { ultimaAtualizacao: new Date().toISOString() }
-        },
-        { upsert: true }
-      );
+        // Inserir no MongoDB
+        const result = await collection.insertOne(auditoria);
+        context.log(`Auditoria registrada com ID: ${result.insertedId}`);
 
-      context.log('Event processed successfully');
+        context.log('Event processed successfully');
     } catch (error) {
-      context.error('Error processing usuario-criado event:', error);
-      throw error; // Rethrow para retry do Service Bus
+        // Garantir que o erro seja logado corretamente
+        const errorMessage = error && error.message ? error.message : 'Unknown error';
+        const errorStack = error && error.stack ? error.stack : 'No stack trace';
+        context.log(`Error processing usuario-criado event: ${errorMessage}`);
+        context.log(`Stack trace: ${errorStack}`);
+        throw error;
     }
-  }
-});
+};

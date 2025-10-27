@@ -17,7 +17,7 @@ class AggregationController {
       const { limit = 10, offset = 0 } = req.query;
 
       // Busca usuários do microserviço
-      const usersResponse = await userService.getAll({ limit, offset });
+      const usersResponse = await userService.getUsers(limit, offset);
 
       // Tenta buscar estatísticas de auditoria da function
       let auditStats = null;
@@ -52,7 +52,7 @@ class AggregationController {
       const { limit = 10, offset = 0, categoria } = req.query;
 
       // Busca produtos do microserviço
-      const productsResponse = await productService.getAll({ limit, offset, categoria });
+      const productsResponse = await productService.getProducts({ limit, offset, categoria });
 
       // Tenta buscar relatórios de auditoria da function
       let lowStockReport = null;
@@ -99,10 +99,10 @@ class AggregationController {
   async getDashboard(req, res, next) {
     try {
       // Busca resumo de usuários
-      const usersResponse = await userService.getAll({ limit: 5, offset: 0 });
+      const usersResponse = await userService.getUsers(5, 0);
 
       // Busca resumo de produtos
-      const productsResponse = await productService.getAll({ limit: 5, offset: 0 });
+      const productsResponse = await productService.getProducts({ limit: 5, offset: 0 });
 
       // Tenta buscar estatísticas de auditoria
       let userStats = null;
@@ -116,11 +116,11 @@ class AggregationController {
       }
 
       // Tenta buscar relatórios de produtos
-      let lowStock = null;
-      let nearExpiration = null;
+      let lowStockData = null;
+      let nearExpirationData = null;
 
       try {
-        lowStock = await azureFunctionService.callFunction2({
+        lowStockData = await azureFunctionService.callFunction2({
           path: '/api/relatorios/estoque-baixo',
           method: 'GET',
           params: { limit: 5 }
@@ -130,7 +130,7 @@ class AggregationController {
       }
 
       try {
-        nearExpiration = await azureFunctionService.callFunction2({
+        nearExpirationData = await azureFunctionService.callFunction2({
           path: '/api/relatorios/vencimentos-proximos',
           method: 'GET',
           params: { limit: 5 }
@@ -139,21 +139,21 @@ class AggregationController {
         console.warn('Relatório de vencimentos não disponível:', error.message);
       }
 
-      // Retorna dashboard agregado
+      // Normaliza as respostas para garantir arrays
+      const lowStockAlerts = Array.isArray(lowStockData?.produtos) 
+        ? lowStockData.produtos 
+        : [];
+      const nearExpirationAlerts = Array.isArray(nearExpirationData?.produtosProximos) 
+        ? nearExpirationData.produtosProximos 
+        : [];
+
+      // Retorna dashboard agregado com estrutura padronizada
       res.json({
-        usuarios: {
-          total: usersResponse.total,
-          recentes: usersResponse.data,
-          estatisticas: userStats || { message: 'Estatísticas não disponíveis' }
-        },
-        produtos: {
-          total: productsResponse.total,
-          recentes: productsResponse.data,
-          alertas: {
-            estoqueBaixo: lowStock || { message: 'Relatório não disponível' },
-            vencimentosProximos: nearExpiration || { message: 'Relatório não disponível' }
-          }
-        },
+        totalUsers: usersResponse.total || 0,
+        totalProducts: productsResponse.total || 0,
+        userStatistics: userStats || null,
+        lowStockAlerts: lowStockAlerts,
+        nearExpirationAlerts: nearExpirationAlerts,
         timestamp: new Date().toISOString()
       });
     } catch (error) {

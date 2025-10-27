@@ -1,82 +1,78 @@
-const { app } = require('@azure/functions');
 const { connectDatabase } = require('../config/database');
 
-app.http('GetStatistics', {
-  methods: ['GET'],
-  authLevel: 'function',
-  route: 'statistics',
-  handler: async (request, context) => {
-    try {
-      const db = await connectDatabase();
-      const collection = db.collection('usuarios_auditoria');
+module.exports = async function (context, req) {
+  try {
+    context.log('GetStatistics function triggered');
 
-      // Total de usuários criados via eventos
-      const totalUsuarios = await collection.countDocuments({});
+    const db = await connectDatabase();
+    const collection = db.collection('usuarios_auditoria');
 
-      // Usuários criados hoje
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const usuariosHoje = await collection.countDocuments({
-        timestamp: { $gte: hoje.toISOString() }
-      });
+    // Total de usuários criados via eventos
+    const totalUsuarios = await collection.countDocuments({});
 
-      // Última data de processamento
-      const ultimoRegistro = await collection
-        .find({})
-        .sort({ timestamp: -1 })
-        .limit(1)
-        .toArray();
+    // Usuários criados hoje
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const usuariosHoje = await collection.countDocuments({
+      timestamp: { $gte: hoje.toISOString() }
+    });
 
-      const ultimaData = ultimoRegistro.length > 0 
-        ? ultimoRegistro[0].timestamp 
-        : null;
+    // Última data de processamento
+    const ultimoRegistro = await collection
+      .find({})
+      .sort({ timestamp: -1 })
+      .limit(1)
+      .toArray();
 
-      // Usuários por dia (últimos 7 dias)
-      const seteDiasAtras = new Date();
-      seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
-      
-      const usuariosPorDia = await collection.aggregate([
-        {
-          $match: {
-            timestamp: { $gte: seteDiasAtras.toISOString() }
-          }
-        },
-        {
-          $group: {
-            _id: { $substr: ["$timestamp", 0, 10] },
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $sort: { _id: 1 }
+    const ultimaData = ultimoRegistro.length > 0 
+      ? ultimoRegistro[0].timestamp 
+      : null;
+
+    // Usuários por dia (últimos 7 dias)
+    const seteDiasAtras = new Date();
+    seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+    
+    const usuariosPorDia = await collection.aggregate([
+      {
+        $match: {
+          timestamp: { $gte: seteDiasAtras.toISOString() }
         }
-      ]).toArray();
+      },
+      {
+        $group: {
+          _id: { $substr: ["$timestamp", 0, 10] },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
+    ]).toArray();
 
-      return {
-        status: 200,
-        jsonBody: {
-          success: true,
-          statistics: {
-            totalUsuariosCriados: totalUsuarios,
-            usuariosCriadosHoje: usuariosHoje,
-            ultimaDataProcessamento: ultimaData,
-            usuariosPorDia: usuariosPorDia.map(item => ({
-              data: item._id,
-              count: item.count
-            }))
-          }
+    context.res = {
+      status: 200,
+      body: {
+        success: true,
+        statistics: {
+          totalUsuariosCriados: totalUsuarios,
+          usuariosCriadosHoje: usuariosHoje,
+          ultimaDataProcessamento: ultimaData,
+          usuariosPorDia: usuariosPorDia.map(item => ({
+            data: item._id,
+            count: item.count
+          }))
         }
-      };
-    } catch (error) {
-      context.error('Error in GetStatistics:', error);
-      return {
-        status: 500,
-        jsonBody: {
-          success: false,
-          message: 'Erro ao buscar estatísticas',
-          error: error.message
-        }
-      };
-    }
+      }
+    };
+  } catch (error) {
+    context.log(`Error in GetStatistics: ${error.message}`);
+    context.res = {
+      status: 500,
+      body: {
+        success: false,
+        message: 'Erro ao buscar estatísticas',
+        error: error.message
+      }
+    };
   }
-});
+};

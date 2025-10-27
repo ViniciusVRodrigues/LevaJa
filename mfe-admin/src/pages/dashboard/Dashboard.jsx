@@ -49,8 +49,8 @@ function Dashboard() {
           <div className="stat-label">Total de Usuários</div>
           {data?.userStatistics && (
             <div className="stat-details">
-              <p>Criados via eventos: {data.userStatistics.totalCreated || 0}</p>
-              <p>Criados hoje: {data.userStatistics.createdToday || 0}</p>
+              <p>Criados via eventos: {data.userStatistics.statistics.totalUsuariosCriados || 0}</p>
+              <p>Criados hoje: {data.userStatistics.statistics.usuariosCriadosHoje || 0}</p>
             </div>
           )}
         </div>
@@ -66,10 +66,10 @@ function Dashboard() {
         <div className="dashboard-card alert-card">
           <h2>⚠️ Estoque Baixo</h2>
           <div className="stat-value alert-value">
-            {data?.lowStockAlerts?.length || 0}
+            {Array.isArray(data?.lowStockAlerts) ? data.lowStockAlerts.length : 0}
           </div>
           <div className="stat-label">Produtos com Estoque ≤ 50</div>
-          {data?.lowStockAlerts && data.lowStockAlerts.length > 0 && (
+          {Array.isArray(data?.lowStockAlerts) && data.lowStockAlerts.length > 0 && (
             <div className="alert-list">
               {data.lowStockAlerts.slice(0, 3).map((product, index) => (
                 <div key={index} className="alert-item">
@@ -84,10 +84,10 @@ function Dashboard() {
         <div className="dashboard-card alert-card">
           <h2>📅 Vencimentos Próximos</h2>
           <div className="stat-value alert-value">
-            {data?.nearExpirationAlerts?.length || 0}
+            {Array.isArray(data?.nearExpirationAlerts) ? data.nearExpirationAlerts.length : 0}
           </div>
           <div className="stat-label">Produtos Vencendo em ≤ 30 dias</div>
-          {data?.nearExpirationAlerts && data.nearExpirationAlerts.length > 0 && (
+          {Array.isArray(data?.nearExpirationAlerts) && data.nearExpirationAlerts.length > 0 && (
             <div className="alert-list">
               {data.nearExpirationAlerts.slice(0, 3).map((product, index) => (
                 <div key={index} className="alert-item">
