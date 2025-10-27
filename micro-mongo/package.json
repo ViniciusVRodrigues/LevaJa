@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "docker-build": "docker build -t viniciusvr/micro-mongo:latest .",
+    "docker-push": "docker push viniciusvr/micro-mongo:latest",
+    "docker-run": "docker run -d -p 5000:5000 --name micro-mongo viniciusvr/micro-mongo:latest"
   },
   "keywords": ["microservice", "mongodb", "products"],
   "author": "Equipe de Desenvolvimento",

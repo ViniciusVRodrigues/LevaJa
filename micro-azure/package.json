@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "docker-build": "docker build -t viniciusvr/micro-azure:latest .",
+    "docker-push": "docker push viniciusvr/micro-azure:latest",
+    "docker-run": "docker run -d -p 4000:4000 --name micro-azure viniciusvr/micro-azure:latest"
   },
   "keywords": ["microservice", "azure-sql", "users"],
   "author": "Equipe de Desenvolvimento",
