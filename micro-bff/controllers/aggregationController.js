@@ -102,7 +102,7 @@ class AggregationController {
       const usersResponse = await userService.getUsers(5, 0);
 
       // Busca resumo de produtos
-      const productsResponse = await productService.getAll({ limit: 5, offset: 0 });
+      const productsResponse = await productService.getProducts({ limit: 5, offset: 0 });
 
       // Tenta buscar estatísticas de auditoria
       let userStats = null;
