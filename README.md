@@ -407,6 +407,19 @@ az staticwebapp create \
 VITE_API_URL=https://levaja-bff.azurewebsites.net/api/v1
 ```
 
+**Importante:** O frontend requer **Node.js v20 ou superior**. O arquivo `.nvmrc` está incluído no projeto para garantir que o Azure Static Web Apps use a versão correta durante o build.
+
+Se encontrar erros relacionados ao Node.js durante o deploy (ex: "EBADENGINE Unsupported engine"), verifique que:
+1. O arquivo `.nvmrc` contém `20`
+2. O `package.json` tem o campo `engines` especificando Node >=20.0.0
+3. A configuração do Azure Static Web Apps está usando o Node.js 20
+
+Para forçar a versão do Node no Azure Static Web Apps, adicione no arquivo de configuração `.github/workflows` (se usando GitHub Actions):
+```yaml
+env:
+  NODE_VERSION: '20'
+```
+
 ## 💻 Configuração Local
 
 ### 1. Pré-requisitos Locais
@@ -491,6 +504,8 @@ npm run dev
 # Rodando em http://localhost:5173
 ```
 
+**Nota:** O frontend requer Node.js v20 ou superior. O arquivo `.nvmrc` está configurado para garantir compatibilidade.
+
 ## ✅ Testes
 
 ### Testar Health Checks
@@ -551,6 +566,24 @@ curl http://localhost:3000/api/v1/agregacao/dashboard
 ```
 
 ## 🐛 Troubleshooting
+
+### Problema: Frontend deployment falha com erro "EBADENGINE Unsupported engine"
+**Causa**: Azure Static Web Apps está usando Node.js v18, mas o projeto requer v20+
+
+**Solução**: 
+1. Verificar que o arquivo `.nvmrc` existe em `mfe-admin/` com conteúdo `20`
+2. Verificar que `package.json` tem o campo `engines` especificando Node >=20.0.0
+3. Se usando GitHub Actions, adicionar ao workflow:
+```yaml
+env:
+  NODE_VERSION: '20'
+```
+4. Limpar cache do Azure e refazer deploy
+```bash
+# Deletar e recriar Static Web App
+az staticwebapp delete --name levaja-frontend --resource-group levaja-rg
+# Recriar com configuração correta
+```
 
 ### Problema: Containers não iniciam no Azure
 **Solução**: Verificar logs do container
