@@ -3,7 +3,7 @@ const { connectDatabase } = require('../config/database');
 
 app.serviceBusQueue('ProcessUsuarioCriado', {
   queueName: 'usuario-criado',
-  connection: 'SERVICE_BUS_CONNECTION',
+  connection: process.env.SERVICE_BUS_CONNECTION,
   handler: async (message, context) => {
     try {
       context.log('Processing usuario-criado event:', message);
