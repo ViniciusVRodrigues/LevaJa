@@ -3,7 +3,7 @@ const { connectDatabase } = require('../config/database');
 
 app.http('GetUsuariosAuditoria', {
   methods: ['GET'],
-  authLevel: 'function',
+  authLevel: 'anonymous',
   route: 'usuarios-auditoria',
   handler: async (request, context) => {
     try {

@@ -3,7 +3,7 @@ const { getPool } = require('../config/database');
 
 app.http('GetRelatorioEstoqueBaixo', {
   methods: ['GET'],
-  authLevel: 'function',
+  authLevel: 'anonymous',
   route: 'relatorios/estoque-baixo',
   handler: async (request, context) => {
     try {

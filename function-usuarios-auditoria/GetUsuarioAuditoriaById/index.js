@@ -4,7 +4,7 @@ const { ObjectId } = require('mongodb');
 
 app.http('GetUsuarioAuditoriaById', {
   methods: ['GET'],
-  authLevel: 'function',
+  authLevel: 'anonymous',
   route: 'usuarios-auditoria/{id}',
   handler: async (request, context) => {
     try {
