@@ -3,7 +3,7 @@ const { getPool } = require('../config/database');
 
 app.serviceBusQueue('ProcessLoteCriado', {
   queueName: 'lote-criado',
-  connection: process.env.SERVICE_BUS_CONNECTION,
+  connection: 'SERVICE_BUS_CONNECTION',
   handler: async (message, context) => {
     try {
       context.log('Processing lote-criado event:', message);
