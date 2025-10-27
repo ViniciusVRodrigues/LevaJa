@@ -1,0 +1,17 @@
+{
+  "name": "function-usuarios-auditoria",
+  "version": "1.0.0",
+  "description": "Azure Function para auditoria de usuários com MongoDB",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "@azure/service-bus": "^7.9.5",
+    "mongodb": "^6.3.0"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.x"
+  }
+}

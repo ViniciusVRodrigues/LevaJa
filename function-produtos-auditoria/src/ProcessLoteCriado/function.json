@@ -1,0 +1,11 @@
+{
+  "bindings": [
+    {
+      "name": "message",
+      "type": "serviceBusTrigger",
+      "direction": "in",
+      "queueName": "lote-criado",
+      "connection": "SERVICE_BUS_CONNECTION"
+    }
+  ]
+}

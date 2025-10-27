@@ -12,30 +12,49 @@ Este documento descreve a arquitetura completa do sistema LevaJá com microsserv
 └──────┬───────┘
        │ HTTP
        ▼
-┌──────────────────────────┐
-│         BFF              │
-│   (API Gateway)          │ :3000
-│     micro-bff            │
-└─────┬────────┬───────────┘
-      │        │
-      │        ├─────────────► Azure Function 1 (HTTP)
-      │        ├─────────────► Azure Function 2 (HTTP)
-      │        └─────────────► Azure Service Bus (mensagens)
-      │
-      ├────────────────────┐
-      │                    │
-      ▼                    ▼
-┌─────────────┐    ┌─────────────┐
-│ micro-azure │    │ micro-mongo │
-│  (Users)    │    │  (Products) │
-│    :3001    │    │    :3002    │
-└──────┬──────┘    └──────┬──────┘
-       │                  │
-       ▼                  ▼
-┌─────────────┐    ┌─────────────┐
-│  Azure SQL  │    │   MongoDB   │
-│   Server    │    │             │
-└─────────────┘    └─────────────┘
+┌──────────────────────────────────────────────┐
+│              BFF (API Gateway)               │
+│              micro-bff :3000                 │
+└─────┬──────────────┬────────────┬────────────┘
+      │              │            │
+      │              │            └──► Azure Service Bus
+      │              │                 ┌─────────────┐
+      │              │                 │usuario-criado│
+      │              │                 │lote-criado   │
+      │              │                 └─────┬────────┘
+      │              │                       │
+      │              │                       ▼
+      │              │              ┌─────────────────┐
+      │              │              │ Azure Functions │
+      │              └──────────────┤  - function-    │
+      │                             │    usuarios-    │
+      │                             │    auditoria    │
+      │                             │  - function-    │
+      │                             │    produtos-    │
+      │                             │    auditoria    │
+      │                             └────┬───────┬────┘
+      │                                  │       │
+      ├──────────────────────────────────┘       │
+      │                                          │
+      ▼                                          ▼
+┌─────────────┐                          ┌─────────────┐
+│ micro-azure │                          │   MongoDB   │
+│  (Users)    │                          │ (Auditoria) │
+│    :3001    │                          └─────────────┘
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐          ┌─────────────┐
+│  Azure SQL  │          │ micro-mongo │
+│   Server    │          │  (Products) │
+│   (Users)   │          │    :3002    │
+└─────────────┘          └──────┬──────┘
+                                │
+┌─────────────┐                 ▼
+│  Azure SQL  │          ┌─────────────┐
+│   Server    │◄─────────│   MongoDB   │
+│ (Auditoria) │          │  (Products) │
+└─────────────┘          └─────────────┘
 ```
 
 ## Componentes
@@ -126,27 +145,85 @@ CREATE TABLE usuarios (
 }
 ```
 
-### 5. Azure Functions (function-azure, function-mongo)
-- **Tecnologia**: Azure Functions (HTTP Trigger)
-- **Responsabilidade**: Processamento assíncrono, eventos
+### 5. Azure Function 1: Auditoria de Usuários (function-usuarios-auditoria)
+- **Tecnologia**: Azure Functions (Node.js)
+- **Banco**: MongoDB
+- **Responsabilidade**: Auditoria e estatísticas de criação de usuários
 
-**Function 1** (function-azure):
-- Processamento de dados de usuários
-- Eventos de criação/atualização
-- Persistência via Service Bus ou diretamente no banco
+**HTTP Triggers (Endpoints de Consulta)**:
+- `GET /api/usuarios-auditoria` - Lista logs de auditoria (paginado)
+- `GET /api/usuarios-auditoria/:id` - Busca auditoria específica
+- `GET /api/statistics` - Estatísticas agregadas (total, por dia, última data)
 
-**Function 2** (function-mongo):
-- Processamento de dados de produtos
-- Eventos de criação/atualização
-- Persistência via Service Bus ou diretamente no banco
+**Service Bus Trigger**:
+- **Fila**: `usuario-criado`
+- **Evento**: `UsuarioCriado`
+- **Ação**: Persiste auditoria no MongoDB, atualiza métricas
 
-### 6. Azure Service Bus
+**Estrutura do Evento**:
+```json
+{
+  "eventType": "UsuarioCriado",
+  "timestamp": "2025-10-26T20:00:00Z",
+  "data": {
+    "usuarioId": "507f1f77bcf86cd799439011",
+    "nome": "João Silva",
+    "email": "joao@exemplo.com"
+  }
+}
+```
+
+### 6. Azure Function 2: Auditoria de Produtos (function-produtos-auditoria)
+- **Tecnologia**: Azure Functions (Node.js)
+- **Banco**: Azure SQL Server
+- **Responsabilidade**: Auditoria, relatórios e alertas de produtos
+
+**HTTP Triggers (Endpoints de Consulta)**:
+- `GET /api/produtos-auditoria` - Lista logs de auditoria (paginado)
+- `GET /api/produtos-auditoria/:id` - Busca auditoria específica
+- `GET /api/relatorios/estoque-baixo` - Relatório de estoque baixo (≤50 unidades)
+- `GET /api/relatorios/vencimentos-proximos` - Relatório de vencimentos (≤30 dias)
+
+**Service Bus Trigger**:
+- **Fila**: `lote-criado`
+- **Evento**: `LoteCriado`
+- **Ação**: 
+  - Persiste auditoria no Azure SQL
+  - Verifica estoque baixo e cria alerta
+  - Verifica vencimento próximo e cria alerta
+
+**Estrutura do Evento**:
+```json
+{
+  "eventType": "LoteCriado",
+  "timestamp": "2025-10-26T20:00:00Z",
+  "data": {
+    "loteId": "507f1f77bcf86cd799439011",
+    "nome": "Arroz Integral 1kg",
+    "categoria": "Alimentos",
+    "estoque": 500,
+    "validade": "2026-12-31",
+    "valor": 15.99
+  }
+}
+```
+
+### 7. Azure Service Bus
 - **Tipo**: Fila de mensagens
 - **Responsabilidade**: Comunicação assíncrona entre componentes
 
+**Filas Configuradas**:
+1. **usuario-criado**: Eventos de criação de usuários
+   - Producer: micro-azure (quando criar usuário)
+   - Consumer: function-usuarios-auditoria
+   
+2. **lote-criado**: Eventos de criação de lotes
+   - Producer: micro-mongo (quando criar produto)
+   - Consumer: function-produtos-auditoria
+
 **Casos de Uso**:
 - Eventos de domínio (usuário criado, produto atualizado)
-- Processamento em background
+- Processamento em background (auditoria, alertas)
 - Desacoplamento entre serviços
 
 ## Fluxos de Dados
@@ -172,26 +249,45 @@ Frontend → BFF → micro-mongo → MongoDB
       Response
 ```
 
-### Fluxo 2: CRUD via Azure Function (Event-Driven)
+### Fluxo 2: CRUD via Azure Function com Auditoria (Event-Driven)
 
-**Criar Usuário via Evento**:
+**Criar Usuário com Auditoria**:
 ```
-Frontend → BFF → Azure Function 1
-         │           ↓
-         │      Service Bus
-         │           ↓
-         │      [Processamento]
-         │           ↓
-         │      micro-azure → Azure SQL
-         ↓
-      Response (202 Accepted)
+Frontend → BFF → micro-azure → Azure SQL (usuário persistido)
+                      ↓
+                 Service Bus (evento: UsuarioCriado)
+                      ↓
+         function-usuarios-auditoria (consume evento)
+                      ↓
+                  MongoDB (auditoria + métricas)
 ```
 
-1. Frontend envia POST para `/api/v1/azure/function1`
-2. BFF chama Azure Function via HTTP
-3. Function processa e envia evento para Service Bus
-4. Outro consumer (pode ser a própria Function) persiste no banco
-5. BFF retorna 202 Accepted imediatamente
+1. Frontend envia POST para `/api/v1/usuarios`
+2. BFF roteia para micro-azure que persiste no Azure SQL
+3. micro-azure publica evento `UsuarioCriado` no Service Bus
+4. function-usuarios-auditoria consome evento
+5. Function registra auditoria e atualiza métricas no MongoDB
+
+**Criar Produto com Auditoria e Alertas**:
+```
+Frontend → BFF → micro-mongo → MongoDB (produto persistido)
+                      ↓
+                 Service Bus (evento: LoteCriado)
+                      ↓
+         function-produtos-auditoria (consume evento)
+                      ↓
+            Azure SQL (auditoria + alertas)
+                      ↓
+          [Verifica estoque baixo ≤50]
+          [Verifica vencimento ≤30 dias]
+```
+
+1. Frontend envia POST para `/api/v1/lotes-produtos`
+2. BFF roteia para micro-mongo que persiste no MongoDB
+3. micro-mongo publica evento `LoteCriado` no Service Bus
+4. function-produtos-auditoria consome evento
+5. Function registra auditoria no Azure SQL
+6. Function verifica regras e cria alertas automáticos
 
 ### Fluxo 3: Agregação de Dados
 
@@ -208,19 +304,24 @@ Frontend → BFF ─┬→ micro-azure → Azure SQL
 3. BFF combina resultados
 4. Retorna resposta única com dados agregados
 
-### Fluxo 4: Processamento Assíncrono
+### Fluxo 4: Consulta de Auditoria e Relatórios
 
-**Atualização em lote com notificação**:
+**Buscar Estatísticas de Usuários**:
 ```
-Frontend → BFF → Azure Function 2
-         │           ↓
-         │      [Processamento]
-         │           ↓
-         │      Service Bus (evento)
-         │           ↓
-         │      micro-mongo → MongoDB
-         ↓
-      Response (202 Accepted)
+Frontend → BFF → function-usuarios-auditoria (HTTP)
+         ↑                    ↓
+         │              MongoDB (query)
+         │                    ↓
+         └────────────[Estatísticas agregadas]
+```
+
+**Buscar Relatório de Estoque Baixo**:
+```
+Frontend → BFF → function-produtos-auditoria (HTTP)
+         ↑                    ↓
+         │         Azure SQL (query com joins)
+         │                    ↓
+         └────────────[Produtos + Alertas]
 ```
 
 ## Comunicação Entre Componentes
@@ -242,22 +343,25 @@ Frontend → BFF → Azure Function 2
 - Agregação disponível combinando chamadas
 
 ✅ **BFF tem endpoint para buscar informações (GET) via HTTP de function e microserviço**
-- `/api/v1/azure/function1` e `/api/v1/azure/function2` chamam Functions
 - `/api/v1/usuarios` e `/api/v1/lotes-produtos` chamam microsserviços
-- Possível criar endpoint agregado que chama ambos
+- `/api/v1/azure/function1` e `/api/v1/azure/function2` podem chamar Functions
+- BFF pode consultar auditorias das Functions via HTTP
+- Possível criar endpoint agregado que combina múltiplas fontes
 
 ✅ **BFF realiza request para function e microserviço para CRUD**
-- Todos os endpoints CRUD implementados
-- Rotas para Functions implementadas
+- Todos os endpoints CRUD implementados para microsserviços
+- BFF pode chamar Functions via HTTP para operações adicionais
+- Microsserviços publicam eventos que Functions consomem
 
 ✅ **BFF realiza request para function para CREATE via evento**
-- Endpoint `/api/v1/azure/process-and-notify` implementado
-- Fluxo: BFF → Function → Service Bus → Persistência
+- Microsserviços publicam eventos no Service Bus ao criar registros
+- Functions consomem eventos e processam auditoria
+- Fluxo: BFF → Microsserviço → Persistência + Service Bus → Function → Auditoria
 
 ✅ **Function recebe evento e persiste no banco de dados**
-- Functions podem receber via HTTP
-- Functions podem publicar no Service Bus
-- Microsserviços persistem os dados
+- function-usuarios-auditoria consome fila `usuario-criado` e persiste no MongoDB
+- function-produtos-auditoria consome fila `lote-criado` e persiste no Azure SQL
+- Functions criam registros de auditoria, métricas e alertas automáticos
 
 ## Configuração
 
@@ -289,6 +393,31 @@ CORS_ORIGIN=http://localhost:3000
 PORT=3002
 MONGODB_URI=mongodb://localhost:27017/levaja-products
 CORS_ORIGIN=http://localhost:3000
+```
+
+**function-usuarios-auditoria (local.settings.json)**:
+```json
+{
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "MONGODB_URI": "mongodb://localhost:27017/auditoria",
+    "SERVICE_BUS_CONNECTION": "Endpoint=sb://..."
+  }
+}
+```
+
+**function-produtos-auditoria (local.settings.json)**:
+```json
+{
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AZURE_SQL_SERVER": "your-server.database.windows.net",
+    "AZURE_SQL_DATABASE": "auditoria",
+    "AZURE_SQL_USER": "sqladmin",
+    "AZURE_SQL_PASSWORD": "your-password",
+    "SERVICE_BUS_CONNECTION": "Endpoint=sb://..."
+  }
+}
 ```
 
 ## Deploy
@@ -327,10 +456,11 @@ Recomendado:
 
 ## Próximos Passos
 
-1. Implementar autenticação JWT no BFF
-2. Hash de senhas (bcrypt) no micro-azure
-3. Rate limiting
-4. Circuit breaker para resiliência
-5. Implementar Azure Functions completas
+1. Integrar microsserviços com Service Bus para publicar eventos
+2. Implementar autenticação JWT no BFF
+3. Hash de senhas (bcrypt) no micro-azure
+4. Rate limiting
+5. Circuit breaker para resiliência
 6. Adicionar testes unitários e integração
 7. CI/CD pipeline
+8. Monitoramento com Application Insights
