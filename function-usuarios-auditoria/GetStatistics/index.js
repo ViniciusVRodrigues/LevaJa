@@ -3,7 +3,7 @@ const { connectDatabase } = require('../config/database');
 
 app.http('GetStatistics', {
   methods: ['GET'],
-  authLevel: 'function',
+  authLevel: 'anonymous',
   route: 'statistics',
   handler: async (request, context) => {
     try {

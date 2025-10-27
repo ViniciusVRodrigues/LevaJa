@@ -3,7 +3,7 @@ const { getPool } = require('../config/database');
 
 app.http('GetRelatorioVencimentosProximos', {
   methods: ['GET'],
-  authLevel: 'function',
+  authLevel: 'anonymous',
   route: 'relatorios/vencimentos-proximos',
   handler: async (request, context) => {
     try {

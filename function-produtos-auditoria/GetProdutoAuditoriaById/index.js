@@ -3,7 +3,7 @@ const { getPool } = require('../config/database');
 
 app.http('GetProdutoAuditoriaById', {
   methods: ['GET'],
-  authLevel: 'function',
+  authLevel: 'anonymous',
   route: 'produtos-auditoria/{id}',
   handler: async (request, context) => {
     try {
