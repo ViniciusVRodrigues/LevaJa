@@ -442,28 +442,96 @@ Para desenvolvimento local, recomenda-se usar Azure Service Bus real (tier bási
 
 ### 3. Iniciar Microserviços
 
-#### micro-azure
+Você tem **três opções** para executar os microserviços localmente:
+
+#### Opção A: Com Docker Compose (Recomendado - Mais Fácil) 🐳
+
+Esta é a forma mais simples e recomendada para desenvolvimento local.
+
 ```bash
+# micro-azure
+cd micro-azure
+cp .env.example .env
+# Editar .env com suas configurações de banco de dados
+docker-compose up -d
+# Rodando em http://localhost:3001
+
+# micro-mongo
+cd micro-mongo
+cp .env.example .env
+# Editar .env com a URI do MongoDB
+docker-compose up -d
+# Rodando em http://localhost:3002
+
+# micro-bff
+cd micro-bff
+cp .env.example .env
+# Editar .env com URLs dos microserviços e Azure
+docker-compose up -d
+# Rodando em http://localhost:3000
+```
+
+**Ver logs:**
+```bash
+docker-compose logs -f
+```
+
+**Parar serviços:**
+```bash
+docker-compose down
+```
+
+#### Opção B: Com Docker Run + --env-file 🐳
+
+Use esta opção se precisar de mais controle sobre os containers:
+
+```bash
+# micro-azure
+cd micro-azure
+cp .env.example .env
+# Editar .env com configurações
+docker build -t micro-azure .
+docker run --env-file .env -p 3001:3001 --name micro-azure micro-azure
+
+# micro-mongo
+cd micro-mongo
+cp .env.example .env
+# Editar .env com configurações
+docker build -t micro-mongo .
+docker run --env-file .env -p 3002:3002 --name micro-mongo micro-mongo
+
+# micro-bff
+cd micro-bff
+cp .env.example .env
+# Editar .env com configurações
+docker build -t micro-bff .
+docker run --env-file .env -p 3000:3000 --name micro-bff micro-bff
+```
+
+**Importante:** O flag `--env-file .env` carrega todas as variáveis do arquivo `.env` no container.
+
+#### Opção C: Com npm (Sem Docker) 📦
+
+Use esta opção para desenvolvimento ativo com hot-reload:
+
+```bash
+# micro-azure
 cd micro-azure
 npm install
 cp .env.example .env
 # Editar .env com suas configurações
 npm start
 # Rodando em http://localhost:3001
-```
 
-#### micro-mongo
-```bash
+# micro-mongo
 cd micro-mongo
 npm install
 cp .env.example .env
 # Editar .env com suas configurações
 npm start
 # Rodando em http://localhost:3002
-```
 
-#### micro-bff
-```bash
+# micro-bff
 cd micro-bff
 npm install
 cp .env.example .env
@@ -566,6 +634,51 @@ curl http://localhost:3000/api/v1/agregacao/dashboard
 ```
 
 ## 🐛 Troubleshooting
+
+### Problema: Containers não estão lendo variáveis de ambiente / Erro de conexão com banco de dados
+**Causa**: Arquivos `.env` são intencionalmente **excluídos** das imagens Docker (via `.dockerignore`) por segurança. Variáveis de ambiente devem ser passadas em **runtime**.
+
+**Solução - Desenvolvimento Local**:
+
+**Opção 1: Usar docker-compose (Recomendado)**
+```bash
+cd micro-azure  # ou micro-mongo, micro-bff
+cp .env.example .env
+# Editar .env com suas configurações
+docker-compose up
+```
+
+O `docker-compose.yml` já está configurado com `env_file: [.env]` para carregar automaticamente as variáveis.
+
+**Opção 2: Usar --env-file com docker run**
+```bash
+docker run --env-file .env -p 3001:3001 micro-azure
+```
+
+**Opção 3: Passar variáveis individualmente**
+```bash
+docker run \
+  -e AZURE_SQL_SERVER=myserver.database.windows.net \
+  -e AZURE_SQL_DATABASE=mydb \
+  -e AZURE_SQL_USER=admin \
+  -e AZURE_SQL_PASSWORD=mypassword \
+  -p 3001:3001 micro-azure
+```
+
+**Solução - Azure (Produção)**:
+No Azure App Service, as variáveis de ambiente são configuradas via:
+- Portal: App Service → Configuration → Application Settings
+- CLI: `az webapp config appsettings set --settings KEY=VALUE`
+
+**Não é necessário (nem recomendado) incluir arquivos `.env` em produção.**
+
+**Verificar se as variáveis estão carregadas:**
+```bash
+# Entrar no container em execução
+docker exec -it <container-name> sh
+# Ver variáveis de ambiente
+env | grep AZURE
+```
 
 ### Problema: Frontend deployment falha com erro "EBADENGINE Unsupported engine"
 **Causa**: Azure Static Web Apps está usando Node.js v18, mas o projeto requer v20+
