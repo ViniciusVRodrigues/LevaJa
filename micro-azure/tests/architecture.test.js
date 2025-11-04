@@ -78,10 +78,10 @@ describe('Arquitetura do micro-azure - Clean Architecture', () => {
     
     expect(serviceFiles.length).toBeGreaterThan(0);
     
-    // Services devem importar conexão de banco
+    // Services devem importar conexão de banco (padrão: require('../db/connection'))
     serviceFiles.forEach(file => {
       const content = fs.readFileSync(path.join(servicesDir, file), 'utf-8');
-      expect(content).toMatch(/require\(['"].*db\/connection['"]\)/);
+      expect(content).toMatch(/require\(['"]\.\.\/db\/connection['"]\)/);
     });
   });
 });

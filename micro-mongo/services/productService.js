@@ -48,6 +48,11 @@ class ProductService {
    * @param {Object} productData - Dados do produto {nome, categoria, estoque, valor, validade?}
    */
   async createProduct(productData) {
+    // Validação de estrutura básica
+    if (!productData || typeof productData !== 'object') {
+      throw new Error('Dados do produto inválidos');
+    }
+
     const { nome, categoria, estoque, valor, validade } = productData;
 
     // Validação básica

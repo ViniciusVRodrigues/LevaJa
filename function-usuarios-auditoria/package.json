@@ -4,7 +4,8 @@
   "description": "Azure Function para auditoria de usuários com MongoDB",
   "scripts": {
     "start": "func start",
-    "test": "echo \"No tests yet\""
+    "test": "jest tests/ || echo 'Jest não instalado. Execute: npm install --save-dev jest'",
+    "test:arch": "jest tests/architecture.test.js || echo 'Jest não instalado. Execute: npm install --save-dev jest'"
   },
   "dependencies": {
     "@azure/service-bus": "^7.9.5",

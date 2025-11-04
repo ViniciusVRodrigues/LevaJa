@@ -64,11 +64,11 @@ describe('Arquitetura do micro-mongo - Clean Architecture', () => {
     controllerFiles.forEach(file => {
       const content = fs.readFileSync(path.join(controllersDir, file), 'utf-8');
       
-      // Controllers devem importar services
-      expect(content).toMatch(/require\(['"].*Service['"]\)/);
+      // Controllers devem importar services (padrão: require('../services/...')
+      expect(content).toMatch(/require\(['"]\.\.\/services\/.*Service['"]\)/);
       
       // Controllers NÃO devem importar modelos diretamente
-      expect(content).not.toMatch(/require\(['"].*models\/['"]\)/);
+      expect(content).not.toMatch(/require\(['"]\.\.\/models\//);
     });
   });
 
