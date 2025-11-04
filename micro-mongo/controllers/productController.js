@@ -1,7 +1,10 @@
-const LoteProduct = require('../models/LoteProduct');
+const productService = require('../services/productService');
+const mongoose = require('mongoose');
 
 /**
  * Controller para operações de lotes de produtos
+ * Camada de apresentação - Clean Architecture
+ * Responsável apenas por receber requisições, validar entrada e retornar respostas
  */
 
 class ProductController {
@@ -12,24 +15,8 @@ class ProductController {
     try {
       const { limit = 10, offset = 0, categoria } = req.query;
 
-      // Filtro por categoria (opcional)
-      const filter = categoria ? { categoria } : {};
-
-      // Total de registros
-      const total = await LoteProduct.countDocuments(filter);
-
-      // Query paginada
-      const products = await LoteProduct.find(filter)
-        .skip(parseInt(offset))
-        .limit(parseInt(limit))
-        .sort({ createdAt: -1 });
-
-      res.json({
-        data: products,
-        total,
-        limit: parseInt(limit),
-        offset: parseInt(offset)
-      });
+      const result = await productService.getAllProducts(limit, offset, categoria);
+      res.json(result);
     } catch (error) {
       console.error('Erro ao listar produtos:', error);
       res.status(500).json({ error: 'Erro ao listar produtos' });
@@ -44,12 +31,11 @@ class ProductController {
       const { id } = req.params;
 
       // Validate if ID is a valid MongoDB ObjectId format
-      const mongoose = require('mongoose');
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ error: 'ID inválido - formato não suportado' });
       }
 
-      const product = await LoteProduct.findById(id);
+      const product = await productService.getProductById(id);
 
       if (!product) {
         return res.status(404).json({ error: 'Produto não encontrado' });
@@ -70,31 +56,20 @@ class ProductController {
    */
   async create(req, res) {
     try {
-      const { nome, categoria, estoque, valor, validade } = req.body;
+      const productData = req.body;
 
-      // Validação básica
-      if (!nome || !categoria || estoque === undefined || valor === undefined) {
-        return res.status(400).json({ 
-          error: 'Campos obrigatórios: nome, categoria, estoque, valor' 
-        });
-      }
-
-      const product = new LoteProduct({
-        nome,
-        categoria,
-        estoque,
-        valor,
-        validade: validade ? new Date(validade) : undefined
-      });
-
-      await product.save();
-
+      const product = await productService.createProduct(productData);
       res.status(201).json(product);
     } catch (error) {
       console.error('Erro ao criar produto:', error);
+      
+      if (error.message.includes('obrigatórios') || error.message.includes('deve ser')) {
+        return res.status(400).json({ error: error.message });
+      }
       if (error.name === 'ValidationError') {
         return res.status(400).json({ error: error.message });
       }
+      
       res.status(500).json({ error: 'Erro ao criar produto' });
     }
   }
@@ -105,40 +80,36 @@ class ProductController {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const { nome, categoria, estoque, valor, validade } = req.body;
+      const productData = req.body;
 
       // Validate if ID is a valid MongoDB ObjectId format
-      const mongoose = require('mongoose');
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ error: 'ID inválido - formato não suportado' });
       }
 
+      // Build update data
       const updateData = {};
-      if (nome !== undefined) updateData.nome = nome;
-      if (categoria !== undefined) updateData.categoria = categoria;
-      if (estoque !== undefined) updateData.estoque = estoque;
-      if (valor !== undefined) updateData.valor = valor;
-      if (validade !== undefined) updateData.validade = validade ? new Date(validade) : null;
+      if (productData.nome !== undefined) updateData.nome = productData.nome;
+      if (productData.categoria !== undefined) updateData.categoria = productData.categoria;
+      if (productData.estoque !== undefined) updateData.estoque = productData.estoque;
+      if (productData.valor !== undefined) updateData.valor = productData.valor;
+      if (productData.validade !== undefined) updateData.validade = productData.validade ? new Date(productData.validade) : null;
 
-      const product = await LoteProduct.findByIdAndUpdate(
-        id,
-        updateData,
-        { new: true, runValidators: true }
-      );
-
-      if (!product) {
-        return res.status(404).json({ error: 'Produto não encontrado' });
-      }
-
+      const product = await productService.updateProduct(id, updateData);
       res.json(product);
     } catch (error) {
       console.error('Erro ao atualizar produto:', error);
+      
+      if (error.message === 'Produto não encontrado') {
+        return res.status(404).json({ error: error.message });
+      }
       if (error.name === 'CastError') {
         return res.status(400).json({ error: 'ID inválido' });
       }
       if (error.name === 'ValidationError') {
         return res.status(400).json({ error: error.message });
       }
+      
       res.status(500).json({ error: 'Erro ao atualizar produto' });
     }
   }
@@ -156,27 +127,22 @@ class ProductController {
       }
 
       // Validate if ID is a valid MongoDB ObjectId format
-      const mongoose = require('mongoose');
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ error: 'ID inválido - formato não suportado' });
       }
 
-      const product = await LoteProduct.findByIdAndUpdate(
-        id,
-        { estoque },
-        { new: true, runValidators: true }
-      );
-
-      if (!product) {
-        return res.status(404).json({ error: 'Produto não encontrado' });
-      }
-
+      const product = await productService.updateStock(id, estoque);
       res.json(product);
     } catch (error) {
       console.error('Erro ao atualizar estoque:', error);
+      
+      if (error.message === 'Produto não encontrado' || error.message.includes('deve ser')) {
+        return res.status(400).json({ error: error.message });
+      }
       if (error.name === 'CastError') {
         return res.status(400).json({ error: 'ID inválido' });
       }
+      
       res.status(500).json({ error: 'Erro ao atualizar estoque' });
     }
   }
@@ -189,23 +155,22 @@ class ProductController {
       const { id } = req.params;
 
       // Validate if ID is a valid MongoDB ObjectId format
-      const mongoose = require('mongoose');
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ error: 'ID inválido - formato não suportado' });
       }
 
-      const product = await LoteProduct.findByIdAndDelete(id);
-
-      if (!product) {
-        return res.status(404).json({ error: 'Produto não encontrado' });
-      }
-
+      await productService.deleteProduct(id);
       res.status(204).send();
     } catch (error) {
       console.error('Erro ao deletar produto:', error);
+      
+      if (error.message === 'Produto não encontrado') {
+        return res.status(404).json({ error: error.message });
+      }
       if (error.name === 'CastError') {
         return res.status(400).json({ error: 'ID inválido' });
       }
+      
       res.status(500).json({ error: 'Erro ao deletar produto' });
     }
   }

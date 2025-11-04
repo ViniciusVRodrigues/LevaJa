@@ -47,6 +47,132 @@ BFF (:3000) ─┬─→ micro-azure (:3001) → Azure SQL
 2. **Criação de Produto**: Frontend → BFF → micro-mongo → MongoDB + **Service Bus** → function-produtos-auditoria → Azure SQL (auditoria + alertas)
 3. **Consulta Agregada**: Frontend → BFF → Agrega dados de microserviços + Azure Functions → Resposta unificada
 
+## 🏛️ Princípios Arquiteturais
+
+### Clean Architecture
+
+O projeto segue os princípios de **Clean Architecture** (Arquitetura Limpa), garantindo separação clara de responsabilidades e independência de frameworks, banco de dados e UI. Cada componente do sistema está organizado em camadas bem definidas:
+
+#### Estrutura de Camadas nos Microserviços
+
+**1. Camada de Apresentação (Controllers)**
+- Recebe requisições HTTP
+- Valida entrada básica
+- Delega processamento para a camada de serviço
+- Retorna respostas formatadas
+- **Exemplo**: `controllers/userController.js`, `controllers/productController.js`
+
+**2. Camada de Negócio (Services)**
+- Contém lógica de negócio
+- Coordena operações entre diferentes componentes
+- Valida regras de negócio
+- Acessa camada de persistência
+- **Exemplo**: `services/userService.js`, `services/productService.js`
+
+**3. Camada de Persistência (DB/Models)**
+- Gerencia conexões com banco de dados
+- Define modelos de dados (Mongoose para MongoDB)
+- Executa queries e comandos SQL/NoSQL
+- **Exemplo**: `db/connection.js`, `models/LoteProduct.js`
+
+**4. Camada de Infraestrutura (Config/Middleware)**
+- Configurações da aplicação
+- Middleware de segurança (Helmet, CORS)
+- Tratamento centralizado de erros
+- Logging
+- **Exemplo**: `config/index.js`, `middleware/errorHandler.js`
+
+#### Estrutura nos Azure Functions
+
+As Azure Functions seguem o princípio de **Single Responsibility**, onde cada função tem uma única responsabilidade bem definida:
+
+- **ProcessUsuarioCriado**: Processa eventos de criação de usuários do Service Bus
+- **GetUsuariosAuditoria**: Endpoint HTTP para consultar logs de auditoria
+- **GetStatistics**: Endpoint HTTP para estatísticas agregadas
+- **TestDatabaseConnection**: Função de diagnóstico para validar conectividade
+
+Cada função importa configuração centralizada de `config/database.js`, mantendo a separação de responsabilidades.
+
+### Vertical Slice Architecture
+
+O sistema implementa **Vertical Slice Architecture** (Arquitetura de Fatia Vertical), onde cada feature possui seu próprio fluxo completo e independente, da interface até a persistência:
+
+#### Slice "Usuários"
+```
+Routes (userRoutes.js)
+   ↓
+Controllers (userController.js)
+   ↓
+Services (userService.js)
+   ↓
+Database (Azure SQL)
+```
+
+**Benefícios**:
+- Mudanças em usuários não afetam produtos
+- Cada slice pode evoluir independentemente
+- Facilita manutenção e testes
+- Reduz acoplamento entre domínios
+
+#### Slice "Produtos"
+```
+Routes (productRoutes.js)
+   ↓
+Controllers (productController.js)
+   ↓
+Services (productService.js)
+   ↓
+Models (LoteProduct.js)
+   ↓
+Database (MongoDB)
+```
+
+#### Slice "Auditoria de Usuários" (Azure Function)
+```
+Service Bus Trigger (ProcessUsuarioCriado)
+   ↓
+HTTP Endpoints (GetUsuariosAuditoria, GetStatistics)
+   ↓
+Config (database.js)
+   ↓
+Database (MongoDB)
+```
+
+**Características**:
+- **Não há dependências cruzadas**: userController não importa productService
+- **Isolamento completo**: cada feature tem seus próprios arquivos
+- **Event-Driven**: comunicação entre slices via Service Bus (eventos)
+- **Autonomia**: cada slice pode usar tecnologia diferente (SQL vs NoSQL)
+
+### Testes de Arquitetura
+
+O projeto inclui **testes unitários de arquitetura** que validam automaticamente:
+
+1. ✅ **Separação de camadas**: Verifica existência de diretórios (controllers, services, routes)
+2. ✅ **Nomenclatura padrão**: Controllers terminam em `Controller.js`, Services em `Service.js`
+3. ✅ **Dependências corretas**: Controllers importam Services, não acessam banco diretamente
+4. ✅ **Vertical Slices isolados**: Features não têm dependências cruzadas indevidas
+5. ✅ **Health checks**: Cada serviço tem endpoint de saúde
+6. ✅ **Configuração centralizada**: Config em diretório dedicado
+
+Para executar os testes de arquitetura:
+```bash
+# micro-bff
+cd micro-bff && npm test
+
+# micro-azure
+cd micro-azure && npm test
+
+# micro-mongo
+cd micro-mongo && npm test
+
+# Azure Functions
+cd function-usuarios-auditoria && npm test
+cd function-produtos-auditoria && npm test
+```
+
+Para mais detalhes técnicos sobre a arquitetura, consulte [ARCHITECTURE.md](./ARCHITECTURE.md).
+
 ## 📦 Componentes do Sistema
 
 ### 1. **mfe-admin** (Frontend React)
@@ -846,6 +972,14 @@ MONGODB_URI=mongodb://levaja-cosmos:...@levaja-cosmos.mongo.cosmos.azure.com:102
 - **micro-bff/SECURITY.md**: Considerações de segurança
 - **function-usuarios-auditoria/README.md**: Documentação da Function de usuários
 - **function-produtos-auditoria/README.md**: Documentação da Function de produtos
+
+## 👥 Autores
+
+Este projeto foi desenvolvido como trabalho acadêmico pelos seguintes alunos:
+
+- **Vinícius Viana Rodrigues**
+
+*Caso haja outros membros da equipe, favor adicionar seus nomes acima.*
 
 ## 🤝 Suporte
 
