@@ -17,9 +17,18 @@ router.get('/usuarios', async (req, res, next) => {
       method: 'GET'
     });
 
-    // Extract statistics from wrapped response
+    // Normalize response for frontend compatibility
     const stats = result?.statistics || result;
-    res.json(stats);
+    const normalized = {
+      totalCreated: stats.totalUsuariosCriados || 0,
+      createdToday: stats.usuariosCriadosHoje || 0,
+      lastProcessed: stats.ultimaDataProcessamento || null,
+      usuariosPorDia: stats.usuariosPorDia || [],
+      // Include verification data if available
+      verification: result?.verification || null
+    };
+    
+    res.json(normalized);
   } catch (error) {
     next(error);
   }
