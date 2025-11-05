@@ -2,26 +2,44 @@ const sql = require('mssql');
 const config = require('../config');
 
 let pool = null;
+let isConnecting = false;
 
 /**
  * Inicializa conexão com Azure SQL
  */
 async function connect() {
   try {
-    if (pool) {
+    if (pool && pool.connected) {
       return pool;
     }
 
+    // Evita múltiplas tentativas simultâneas de conexão
+    if (isConnecting) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return connect();
+    }
+
+    isConnecting = true;
     console.log('Conectando ao Azure SQL Server...');
     pool = await sql.connect(config.database);
+    
+    // Handler para detectar desconexões
+    pool.on('error', (err) => {
+      console.error('Erro na conexão do pool:', err);
+      pool = null;
+    });
+
     console.log('✓ Conectado ao Azure SQL Server');
 
     // Cria tabela se não existir
     await initializeDatabase();
 
+    isConnecting = false;
     return pool;
   } catch (error) {
+    isConnecting = false;
     console.error('Erro ao conectar ao Azure SQL:', error.message);
+    pool = null;
     throw error;
   }
 }
@@ -53,11 +71,13 @@ async function initializeDatabase() {
 }
 
 /**
- * Obtém pool de conexão
+ * Obtém pool de conexão (com auto-reconexão)
  */
-function getPool() {
-  if (!pool) {
-    throw new Error('Database não conectado. Chame connect() primeiro.');
+async function getPool() {
+  // Se não há pool ou está desconectado, reconecta
+  if (!pool || !pool.connected) {
+    console.log('Pool desconectado. Reconectando...');
+    await connect();
   }
   return pool;
 }

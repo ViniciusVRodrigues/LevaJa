@@ -13,7 +13,7 @@ class UserService {
    * @param {number} offset - Offset para paginação
    */
   async getAllUsers(limit = 10, offset = 0) {
-    const pool = getPool();
+    const pool = await getPool();
 
     // Query para total de registros
     const countResult = await pool.request()
@@ -46,7 +46,7 @@ class UserService {
    * @param {number} id - ID do usuário
    */
   async getUserById(id) {
-    const pool = getPool();
+    const pool = await getPool();
 
     const result = await pool.request()
       .input('id', sql.Int, id)
@@ -64,7 +64,7 @@ class UserService {
    * @param {string} email - Email a verificar
    */
   async emailExists(email) {
-    const pool = getPool();
+    const pool = await getPool();
 
     const checkEmail = await pool.request()
       .input('email', sql.NVarChar, email)
@@ -90,7 +90,7 @@ class UserService {
       throw new Error('Email já cadastrado');
     }
 
-    const pool = getPool();
+    const pool = await getPool();
 
     // Insere usuário
     const result = await pool.request()
@@ -120,7 +120,7 @@ class UserService {
       throw new Error('Usuário não encontrado');
     }
 
-    const pool = getPool();
+    const pool = await getPool();
 
     // Monta query dinâmica
     let query = 'UPDATE usuarios SET updatedAt = GETDATE()';
@@ -157,7 +157,7 @@ class UserService {
       throw new Error('Usuário não encontrado');
     }
 
-    const pool = getPool();
+    const pool = await getPool();
 
     await pool.request()
       .input('id', sql.Int, id)

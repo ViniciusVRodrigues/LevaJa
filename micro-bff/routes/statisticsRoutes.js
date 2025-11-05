@@ -155,4 +155,38 @@ router.get('/relatorios/vencimentos-proximos', async (req, res, next) => {
   }
 });
 
+/**
+ * GET /statistics/verify-usuarios
+ * Verifica consistência e erros de dados de usuários
+ */
+router.get('/verify-usuarios', async (req, res, next) => {
+  try {
+    const result = await azureFunctionService.callFunction1({
+      path: '/api/verify-usuarios',
+      method: 'GET'
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /statistics/verify-produtos
+ * Verifica consistência e erros de dados de produtos
+ */
+router.get('/verify-produtos', async (req, res, next) => {
+  try {
+    const result = await azureFunctionService.callFunction2({
+      path: '/api/verify-produtos',
+      method: 'GET'
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
