@@ -118,7 +118,7 @@ router.get('/produtos-auditoria/:id', async (req, res, next) => {
 
 /**
  * GET /statistics/relatorios/estoque-baixo
- * Relatório de produtos com estoque baixo
+ * Relatório de produtos com estoque baixo (retorna apenas array para compatibilidade)
  */
 router.get('/relatorios/estoque-baixo', async (req, res, next) => {
   try {
@@ -131,7 +131,7 @@ router.get('/relatorios/estoque-baixo', async (req, res, next) => {
     });
 
     // Normaliza a resposta para retornar array direto
-    // A Azure Function retorna { produtos: [], alertas: [], ... }
+    // A Azure Function retorna { produtos: [], alertas: [], verification: {...} }
     // Mas o frontend espera apenas o array de produtos
     const produtos = Array.isArray(result?.produtos) ? result.produtos : [];
     res.json(produtos);
@@ -141,8 +141,29 @@ router.get('/relatorios/estoque-baixo', async (req, res, next) => {
 });
 
 /**
+ * GET /statistics/relatorios/estoque-baixo-completo
+ * Relatório completo de produtos com estoque baixo incluindo verificação
+ */
+router.get('/relatorios/estoque-baixo-completo', async (req, res, next) => {
+  try {
+    const { limit = 50 } = req.query;
+
+    const result = await azureFunctionService.callFunction2({
+      path: '/api/relatorios/estoque-baixo',
+      method: 'GET',
+      params: { limit }
+    });
+
+    // Retorna resposta completa com produtos, alertas e verificação
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /statistics/relatorios/vencimentos-proximos
- * Relatório de produtos próximos do vencimento
+ * Relatório de produtos próximos do vencimento (retorna apenas array para compatibilidade)
  */
 router.get('/relatorios/vencimentos-proximos', async (req, res, next) => {
   try {
@@ -155,10 +176,31 @@ router.get('/relatorios/vencimentos-proximos', async (req, res, next) => {
     });
 
     // Normaliza a resposta para retornar array direto
-    // A Azure Function retorna { produtosProximos: [], produtosVencidos: [], ... }
+    // A Azure Function retorna { produtosProximos: [], produtosVencidos: [], verification: {...} }
     // O frontend espera apenas o array de produtos próximos
     const produtos = Array.isArray(result?.produtosProximos) ? result.produtosProximos : [];
     res.json(produtos);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /statistics/relatorios/vencimentos-proximos-completo
+ * Relatório completo de produtos próximos do vencimento incluindo verificação
+ */
+router.get('/relatorios/vencimentos-proximos-completo', async (req, res, next) => {
+  try {
+    const { limit = 50 } = req.query;
+
+    const result = await azureFunctionService.callFunction2({
+      path: '/api/relatorios/vencimentos-proximos',
+      method: 'GET',
+      params: { limit }
+    });
+
+    // Retorna resposta completa com produtos, alertas e verificação
+    res.json(result);
   } catch (error) {
     next(error);
   }

@@ -56,24 +56,66 @@ function Audit() {
 
       {/* Estatísticas */}
       {statistics && activeTab === 'users' && (
-        <div className="statistics-panel">
-          <div className="stat-card">
-            <div className="stat-value">{statistics.totalCreated || 0}</div>
-            <div className="stat-label">Total de Usuários Criados via Eventos</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{statistics.createdToday || 0}</div>
-            <div className="stat-label">Criados Hoje</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">
-              {statistics.lastProcessed 
-                ? new Date(statistics.lastProcessed).toLocaleDateString()
-                : 'N/A'}
+        <>
+          <div className="statistics-panel">
+            <div className="stat-card">
+              <div className="stat-value">{statistics.totalCreated || 0}</div>
+              <div className="stat-label">Total de Usuários Criados via Eventos</div>
             </div>
-            <div className="stat-label">Último Processamento</div>
+            <div className="stat-card">
+              <div className="stat-value">{statistics.createdToday || 0}</div>
+              <div className="stat-label">Criados Hoje</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">
+                {statistics.lastProcessed 
+                  ? new Date(statistics.lastProcessed).toLocaleDateString()
+                  : 'N/A'}
+              </div>
+              <div className="stat-label">Último Processamento</div>
+            </div>
           </div>
-        </div>
+
+          {/* Verificação de Dados */}
+          {statistics.verification && (
+            <div className="verification-panel">
+              <h3>🔍 Verificação de Integridade de Dados</h3>
+              <div className="verification-stats">
+                <div className="verification-item">
+                  <span className="verification-label">Usuários no Azure SQL:</span>
+                  <span className="verification-value">{statistics.verification.totalUsuariosAzureSQL || 0}</span>
+                </div>
+                <div className="verification-item">
+                  <span className="verification-label">Inconsistências Encontradas:</span>
+                  <span className={`verification-value ${statistics.verification.totalInconsistencias > 0 ? 'warning' : 'success'}`}>
+                    {statistics.verification.totalInconsistencias || 0}
+                  </span>
+                </div>
+              </div>
+              
+              {statistics.verification.inconsistencias && statistics.verification.inconsistencias.length > 0 && (
+                <div className="inconsistencies-list">
+                  <h4>⚠️ Inconsistências Detectadas:</h4>
+                  {statistics.verification.inconsistencias.map((inc, index) => (
+                    <div key={index} className={`inconsistency-item severity-${inc.severidade?.toLowerCase()}`}>
+                      <span className="inconsistency-type">{inc.tipo}</span>
+                      <span className="inconsistency-message">{inc.mensagem}</span>
+                      <span className={`inconsistency-severity badge-${inc.severidade?.toLowerCase()}`}>
+                        {inc.severidade}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {(!statistics.verification.inconsistencias || statistics.verification.inconsistencias.length === 0) && (
+                <div className="no-inconsistencies">
+                  ✅ Nenhuma inconsistência detectada. Dados integros.
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <div className="tabs">
