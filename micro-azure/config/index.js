@@ -11,12 +11,21 @@ const config = {
     password: process.env.AZURE_SQL_PASSWORD,
     options: {
       encrypt: process.env.AZURE_SQL_ENCRYPT === 'true',
-      trustServerCertificate: process.env.NODE_ENV === 'development'
+      trustServerCertificate: process.env.NODE_ENV === 'development',
+      // Configurações para prevenir timeouts
+      enableArithAbort: true,
+      connectTimeout: 30000, // 30 segundos
+      requestTimeout: 30000   // 30 segundos
     },
     pool: {
       max: 10,
-      min: 0,
-      idleTimeoutMillis: 30000
+      min: 2, // Mantém pelo menos 2 conexões ativas
+      idleTimeoutMillis: 300000, // 5 minutos (aumentado de 30s)
+      acquireTimeoutMillis: 30000,
+      createTimeoutMillis: 30000,
+      destroyTimeoutMillis: 5000,
+      reapIntervalMillis: 1000,
+      createRetryIntervalMillis: 200
     }
   },
   

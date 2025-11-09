@@ -966,12 +966,45 @@ MONGODB_URI=mongodb://levaja-cosmos:...@levaja-cosmos.mongo.cosmos.azure.com:102
 
 ## 📚 Documentação Adicional
 
+### Arquitetura e Deployment
 - **ARCHITECTURE.md**: Arquitetura completa do sistema
+- **SECURITY_SUMMARY.md**: Análise de segurança e vulnerabilidades
 - **micro-bff/AZURE_DEPLOY.md**: Guia detalhado de deploy do BFF
 - **micro-bff/AZURE_INTEGRATION.md**: Integração com Azure Services
 - **micro-bff/SECURITY.md**: Considerações de segurança
+
+### Microserviços
+- **micro-azure/TROUBLESHOOTING.md**: 🆕 Guia de troubleshooting para desconexões Azure SQL
 - **function-usuarios-auditoria/README.md**: Documentação da Function de usuários
 - **function-produtos-auditoria/README.md**: Documentação da Function de produtos
+
+### Frontend
+- **mfe-admin/DEPLOY.md**: 🆕 Guia completo de deploy do frontend
+- **mfe-admin/staticwebapp.config.json**: 🆕 Configuração para Azure Static Web Apps
+
+### Testes
+- **micro-bff/tests/architecture.test.js**: Testes de arquitetura do BFF
+- **micro-azure/tests/architecture.test.js**: Testes de arquitetura do micro-azure
+- **micro-mongo/tests/architecture.test.js**: Testes de arquitetura do micro-mongo
+- **function-usuarios-auditoria/tests/architecture.test.js**: Testes de arquitetura da function
+- **function-produtos-auditoria/tests/architecture.test.js**: Testes de arquitetura da function
+
+## 🔧 Guias de Troubleshooting
+
+### Problema: Frontend não faz build
+**Solução**: Consulte **mfe-admin/DEPLOY.md**
+```bash
+cd mfe-admin
+npm install
+npm run build
+```
+
+### Problema: Microserviço Azure desconecta do SQL
+**Solução**: Consulte **micro-azure/TROUBLESHOOTING.md**
+- ✅ Auto-reconexão implementada
+- ✅ Keep-alive a cada 4 minutos
+- ✅ Pool otimizado com min=2 conexões
+- ✅ Timeouts aumentados para 5 minutos
 
 ## 👥 Autores
 
