@@ -6,57 +6,91 @@ Este documento explica como resolver problemas de desconexão do microserviço `
 
 O microserviço desconecta do Azure SQL Database por inatividade e precisa ser reiniciado manualmente.
 
-## Soluções Implementadas
+## Solução Implementada: Lazy Connection (Conexão Sob Demanda)
 
-### 1. Auto-Reconexão Inteligente
+### Como Funciona
 
 **Arquivo**: `micro-azure/db/connection.js`
 
-**Melhorias**:
-- ✅ Detecção de desconexão antes de cada query
-- ✅ Teste de saúde da conexão (`SELECT 1`)
-- ✅ Reconexão automática quando necessário
-- ✅ Proteção contra múltiplas tentativas simultâneas
-- ✅ Intervalo mínimo entre reconexões (5 segundos)
-- ✅ Fechamento adequado de pools antigos antes de reconectar
+Ao invés de conectar no startup e tentar manter a conexão ativa com keep-alive, o microserviço agora usa **conexão lazy (preguiçosa)**:
 
-### 2. Keep-Alive Automático
-
-**Funcionalidade**: Query periódica para manter conexão ativa
+1. ✅ **Servidor inicia SEM conectar ao banco** - Evita falhas no startup por timeout
+2. ✅ **Conexão criada apenas quando chega um request** - Via `getPool()`
+3. ✅ **Auto-reconexão automática em cada request** - Se pool estiver desconectado, reconecta
+4. ✅ **Sem keep-alive em background** - Não há processos periódicos que possam falhar
+5. ✅ **Intervalo mínimo de 3s entre tentativas** - Evita reconexões muito frequentes
 
 ```javascript
-// Executa SELECT 1 a cada 4 minutos
-setInterval(() => {
-  pool.request().query('SELECT 1 AS keepalive');
-}, 4 * 60 * 1000);
+async function getPool() {
+  // Verifica se pool está disponível e conectado
+  if (pool && pool.connected && pool.healthy) {
+    return pool;
+  }
+  
+  // Se não está conectado, conecta agora (lazy)
+  console.log('🔄 Pool não disponível. Conectando...');
+  return await connect();
+}
 ```
 
-**Benefícios**:
-- Previne timeout por inatividade
-- Mantém pool aquecido
-- Detecta desconexões proativamente
+**Vantagens desta abordagem**:
+- ✅ Servidor sempre inicia com sucesso (não depende do banco)
+- ✅ Reconecta automaticamente a cada request se necessário
+- ✅ Não há processos em background que possam falhar
+- ✅ Tolerante a falhas temporárias do Azure SQL
+- ✅ Não precisa de restart manual
+- ✅ Funciona mesmo se Azure SQL estiver pausado (Serverless)
 
-### 3. Configurações Otimizadas do Pool
+### Logs Esperados
+
+**Startup do servidor** (sem conexão ao banco):
+```
+╔══════════════════════════════════════════════╗
+║   Microserviço de Usuários - Azure SQL      ║
+║   Servidor: http://localhost:3002           ║
+║   Ambiente: development                     ║
+║   Conexão: Lazy (sob demanda)               ║
+╚══════════════════════════════════════════════╝
+```
+
+**Primeiro request** (cria conexão):
+```
+🔄 Pool não disponível. Conectando...
+🔄 Conectando ao Azure SQL Server...
+✅ Conectado ao Azure SQL Server
+✅ Tabela usuarios verificada/criada
+```
+
+**Requests subsequentes** (pool já conectado):
+```
+(nenhum log - usa pool existente)
+```
+
+**Request após desconexão** (reconecta automaticamente):
+```
+🔄 Pool não disponível. Conectando...
+⏱️ Aguardando 3000ms antes de reconectar...
+🔌 Pool anterior fechado
+🔄 Conectando ao Azure SQL Server...
+✅ Conectado ao Azure SQL Server
+```
+
+### Configurações do Pool
 
 **Arquivo**: `micro-azure/config/index.js`
 
-**Configurações**:
 ```javascript
 pool: {
   max: 10,                          // Máximo de conexões
   min: 2,                           // Mínimo de conexões (mantém pool aquecido)
-  idleTimeoutMillis: 300000,        // 5 minutos (antes: 30s)
+  idleTimeoutMillis: 300000,        // 5 minutos
   acquireTimeoutMillis: 30000,      // Timeout para adquirir conexão
   createTimeoutMillis: 30000,       // Timeout para criar conexão
   destroyTimeoutMillis: 5000,       // Timeout para destruir conexão
   reapIntervalMillis: 1000,         // Verifica conexões idle
   createRetryIntervalMillis: 200    // Intervalo entre retries
 }
-```
 
-### 4. Timeouts Aumentados
-
-```javascript
 options: {
   connectTimeout: 30000,  // 30 segundos
   requestTimeout: 30000,  // 30 segundos

@@ -55,8 +55,8 @@ const PORT = config.port;
 
 async function startServer() {
   try {
-    // Conecta ao banco
-    await connect();
+    // NÃO conecta ao banco no startup - conexão lazy (sob demanda)
+    // A conexão será criada automaticamente no primeiro request via getPool()
 
     // Inicia servidor
     const server = app.listen(PORT, () => {
@@ -65,6 +65,7 @@ async function startServer() {
 ║   Microserviço de Usuários - Azure SQL      ║
 ║   Servidor: http://localhost:${PORT}         ║
 ║   Ambiente: ${config.nodeEnv}               ║
+║   Conexão: Lazy (sob demanda)               ║
 ╚══════════════════════════════════════════════╝
       `);
     });

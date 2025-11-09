@@ -5,28 +5,26 @@ let pool = null;
 let isConnecting = false;
 let connectionPromise = null;
 let lastConnectionAttempt = 0;
-const MIN_RECONNECT_INTERVAL = 5000; // 5 segundos entre tentativas
+const MIN_RECONNECT_INTERVAL = 3000; // 3 segundos entre tentativas
+let tableInitialized = false;
 
 /**
- * Inicializa conexão com Azure SQL
+ * Inicializa conexão com Azure SQL (lazy - só quando necessário)
  */
 async function connect() {
   try {
-    // Verifica se já existe uma conexão válida
-    if (pool && pool.connected && pool.healthy) {
-      return pool;
-    }
-
     // Se já está conectando, aguarda a promessa existente
     if (isConnecting && connectionPromise) {
+      console.log('⏳ Aguardando conexão em andamento...');
       return await connectionPromise;
     }
 
     // Evita reconexões muito frequentes
     const now = Date.now();
     if (now - lastConnectionAttempt < MIN_RECONNECT_INTERVAL) {
-      console.log('Aguardando intervalo de reconexão...');
-      await new Promise(resolve => setTimeout(resolve, MIN_RECONNECT_INTERVAL - (now - lastConnectionAttempt)));
+      const waitTime = MIN_RECONNECT_INTERVAL - (now - lastConnectionAttempt);
+      console.log(`⏱️ Aguardando ${waitTime}ms antes de reconectar...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 
     isConnecting = true;
@@ -36,13 +34,14 @@ async function connect() {
     if (pool) {
       try {
         await pool.close();
+        console.log('🔌 Pool anterior fechado');
       } catch (err) {
-        console.error('Erro ao fechar pool anterior:', err.message);
+        console.warn('⚠️ Erro ao fechar pool anterior:', err.message);
       }
       pool = null;
     }
 
-    console.log('Conectando ao Azure SQL Server...');
+    console.log('🔄 Conectando ao Azure SQL Server...');
     
     // Cria nova promessa de conexão
     connectionPromise = sql.connect(config.database);
@@ -50,14 +49,18 @@ async function connect() {
     
     // Handler para detectar desconexões
     pool.on('error', (err) => {
-      console.error('⚠️ Erro na conexão do pool:', err.message);
+      console.error('❌ Erro na conexão do pool:', err.message);
       pool = null;
+      tableInitialized = false;
     });
 
-    console.log('✓ Conectado ao Azure SQL Server');
+    console.log('✅ Conectado ao Azure SQL Server');
 
-    // Cria tabela se não existir
-    await initializeDatabase();
+    // Inicializa tabela apenas uma vez
+    if (!tableInitialized) {
+      await initializeDatabase();
+      tableInitialized = true;
+    }
 
     isConnecting = false;
     connectionPromise = null;
@@ -65,8 +68,8 @@ async function connect() {
   } catch (error) {
     isConnecting = false;
     connectionPromise = null;
-    console.error('❌ Erro ao conectar ao Azure SQL:', error.message);
     pool = null;
+    console.error('❌ Erro ao conectar ao Azure SQL:', error.message);
     throw error;
   }
 }
@@ -91,69 +94,42 @@ async function initializeDatabase() {
     `;
 
     await pool.request().query(createTableQuery);
-    console.log('✓ Tabela usuarios verificada/criada');
-
-    // Inicia keep-alive para prevenir desconexões por inatividade
-    startKeepAlive();
+    console.log('✅ Tabela usuarios verificada/criada');
   } catch (error) {
-    console.error('Erro ao inicializar database:', error.message);
+    console.error('❌ Erro ao inicializar database:', error.message);
+    throw error;
   }
 }
 
-let keepAliveInterval = null;
-
 /**
- * Mantém a conexão ativa com queries periódicas
- */
-function startKeepAlive() {
-  // Limpa interval anterior se existir
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-  }
-
-  // Executa query simples a cada 4 minutos para manter conexão ativa
-  keepAliveInterval = setInterval(async () => {
-    try {
-      if (pool && pool.connected) {
-        await pool.request().query('SELECT 1 AS keepalive');
-        console.log('💓 Keep-alive: conexão mantida');
-      }
-    } catch (err) {
-      console.warn('⚠️ Keep-alive falhou:', err.message);
-      pool = null;
-    }
-  }, 4 * 60 * 1000); // 4 minutos
-}
-
-/**
- * Obtém pool de conexão (com auto-reconexão)
+ * Obtém pool de conexão (com auto-reconexão sob demanda)
+ * Esta função é chamada toda vez que um request precisa acessar o banco
  */
 async function getPool() {
   try {
-    // Verifica se o pool existe e está saudável
+    // Verifica se o pool existe e está conectado
     if (pool && pool.connected && pool.healthy) {
-      // Testa a conexão com uma query simples
-      try {
-        await pool.request().query('SELECT 1 AS test');
-        return pool;
-      } catch (err) {
-        console.warn('⚠️ Pool parece conectado mas falhou no teste:', err.message);
-        pool = null;
-      }
+      return pool;
     }
 
-    // Se não há pool válido, reconecta
+    // Se pool não existe ou está desconectado, cria novo
     if (!pool || !pool.connected) {
-      console.log('🔄 Pool desconectado. Reconectando...');
-      await connect();
+      console.log('🔄 Pool não disponível. Conectando...');
+      return await connect();
     }
 
     return pool;
   } catch (error) {
     console.error('❌ Erro ao obter pool:', error.message);
-    // Tenta reconectar uma vez
-    await connect();
-    return pool;
+    
+    // Em caso de erro, tenta reconectar
+    try {
+      console.log('🔄 Tentando reconectar após erro...');
+      return await connect();
+    } catch (reconnectError) {
+      console.error('❌ Falha na reconexão:', reconnectError.message);
+      throw reconnectError;
+    }
   }
 }
 
@@ -161,16 +137,15 @@ async function getPool() {
  * Fecha conexão
  */
 async function close() {
-  // Limpa keep-alive
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-    keepAliveInterval = null;
-  }
-
   if (pool) {
-    await pool.close();
-    pool = null;
-    console.log('Conexão com Azure SQL fechada');
+    try {
+      await pool.close();
+      pool = null;
+      tableInitialized = false;
+      console.log('🔌 Conexão com Azure SQL fechada');
+    } catch (err) {
+      console.error('❌ Erro ao fechar conexão:', err.message);
+    }
   }
 }
 
