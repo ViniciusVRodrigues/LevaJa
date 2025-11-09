@@ -121,18 +121,24 @@ class AggregationController {
           path: '/api/statistics',
           method: 'GET'
         });
-        // Normaliza a estrutura para garantir consistência
+        console.log('GetStatistics response:', JSON.stringify(rawStats, null, 2));
+        
+        // Azure Function retorna { success, statistics, verification }
+        // Extraímos statistics e verification
+        const stats = rawStats?.statistics || rawStats?.body?.statistics || {};
+        const verification = rawStats?.verification || rawStats?.body?.verification || null;
+        
         userStats = {
-          statistics: rawStats?.statistics || {
-            totalUsuariosCriados: 0,
-            usuariosCriadosHoje: 0,
-            ultimaDataProcessamento: null,
-            usuariosPorDia: []
+          statistics: {
+            totalUsuariosCriados: stats.totalUsuariosCriados || 0,
+            usuariosCriadosHoje: stats.usuariosCriadosHoje || 0,
+            ultimaDataProcessamento: stats.ultimaDataProcessamento || null,
+            usuariosPorDia: stats.usuariosPorDia || []
           },
-          verification: rawStats?.verification || null
+          verification: verification
         };
       } catch (error) {
-        console.warn('Estatísticas de usuários não disponíveis:', error.message);
+        console.error('Erro ao buscar estatísticas de usuários:', error.message);
         // Estrutura padrão quando a função falha
         userStats = {
           statistics: {
@@ -150,31 +156,41 @@ class AggregationController {
       let nearExpirationData = null;
 
       try {
-        lowStockData = await azureFunctionService.callFunction2({
+        const lowStockRaw = await azureFunctionService.callFunction2({
           path: '/api/relatorios/estoque-baixo',
           method: 'GET',
           params: { limit: 5 }
         });
+        console.log('Low stock report response:', JSON.stringify(lowStockRaw, null, 2));
+        lowStockData = lowStockRaw;
       } catch (error) {
-        console.warn('Relatório de estoque baixo não disponível:', error.message);
+        console.error('Relatório de estoque baixo não disponível:', error.message);
       }
 
       try {
-        nearExpirationData = await azureFunctionService.callFunction2({
+        const nearExpRaw = await azureFunctionService.callFunction2({
           path: '/api/relatorios/vencimentos-proximos',
           method: 'GET',
           params: { limit: 5 }
         });
+        console.log('Near expiration report response:', JSON.stringify(nearExpRaw, null, 2));
+        nearExpirationData = nearExpRaw;
       } catch (error) {
-        console.warn('Relatório de vencimentos não disponível:', error.message);
+        console.error('Relatório de vencimentos não disponível:', error.message);
       }
 
       // Normaliza as respostas para garantir arrays
+      // Azure Functions retornam { produtos: [], alertas: [], verification: {} } ou { produtosProximos: [], produtosVencidos: [], verification: {} }
       const lowStockAlerts = Array.isArray(lowStockData?.produtos) 
         ? lowStockData.produtos 
+        : Array.isArray(lowStockData?.recordset) 
+        ? lowStockData.recordset
         : [];
+      
       const nearExpirationAlerts = Array.isArray(nearExpirationData?.produtosProximos) 
         ? nearExpirationData.produtosProximos 
+        : Array.isArray(nearExpirationData?.recordset)
+        ? nearExpirationData.recordset
         : [];
 
       // Retorna dashboard agregado com estrutura padronizada
