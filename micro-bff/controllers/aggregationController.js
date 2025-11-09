@@ -22,12 +22,22 @@ class AggregationController {
       // Tenta buscar estatísticas de auditoria da function
       let auditStats = null;
       try {
-        auditStats = await azureFunctionService.callFunction1({
+        const rawStats = await azureFunctionService.callFunction1({
           path: '/api/statistics',
           method: 'GET'
         });
+        // Normaliza a estrutura
+        auditStats = {
+          statistics: rawStats?.statistics || {},
+          verification: rawStats?.verification || null
+        };
       } catch (error) {
         console.warn('Não foi possível buscar estatísticas de auditoria:', error.message);
+        auditStats = {
+          statistics: {},
+          verification: null,
+          error: error.message
+        };
       }
 
       // Retorna dados agregados
@@ -36,7 +46,7 @@ class AggregationController {
         total: usersResponse.total,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        auditoria: auditStats || { message: 'Estatísticas de auditoria não disponíveis' }
+        auditoria: auditStats
       });
     } catch (error) {
       next(error);
@@ -107,12 +117,32 @@ class AggregationController {
       // Tenta buscar estatísticas de auditoria
       let userStats = null;
       try {
-        userStats = await azureFunctionService.callFunction1({
+        const rawStats = await azureFunctionService.callFunction1({
           path: '/api/statistics',
           method: 'GET'
         });
+        // Normaliza a estrutura para garantir consistência
+        userStats = {
+          statistics: rawStats?.statistics || {
+            totalUsuariosCriados: 0,
+            usuariosCriadosHoje: 0,
+            ultimaDataProcessamento: null,
+            usuariosPorDia: []
+          },
+          verification: rawStats?.verification || null
+        };
       } catch (error) {
         console.warn('Estatísticas de usuários não disponíveis:', error.message);
+        // Estrutura padrão quando a função falha
+        userStats = {
+          statistics: {
+            totalUsuariosCriados: 0,
+            usuariosCriadosHoje: 0,
+            ultimaDataProcessamento: null,
+            usuariosPorDia: []
+          },
+          verification: null
+        };
       }
 
       // Tenta buscar relatórios de produtos
