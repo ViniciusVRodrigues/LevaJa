@@ -1,77 +1,104 @@
 openapi: 3.0.3
 info:
-  title: API de Gestão de Usuários e Produtos
-  description: |
-    API para gerenciamento de usuários e lotes de produtos.
-    Desenvolvida como parte do projeto PJBL de Arquitetura Cloud.
+  title: BFF API Gateway - LevaJá
   version: 1.0.0
+  description: |
+    Backend for Frontend (BFF) API Gateway que agrega dados de múltiplos microserviços e Azure Functions.
+
+    ## Arquitetura
+
+    Este BFF atua como intermediário entre o frontend e:
+    - **micro-azure**: Microserviço de Usuários (Azure SQL)
+    - **micro-mongo**: Microserviço de Produtos (MongoDB)
+    - **Azure Functions**: Functions de Auditoria e Relatórios
+
+    ## Funcionalidades
+
+    - **Proxy**: Encaminha requisições aos microserviços
+    - **Agregação**: Combina dados de múltiplas fontes
+    - **Service Bus**: Publica eventos para processamento assíncrono
+    - **Azure Functions**: Integração via HTTP triggers
   contact:
-    name: Equipe de Desenvolvimento
-    email: contato@exemplo.com
+    name: Vinícius Viana Rodrigues
+    email: viniciusvrodrigues@github.com
+  license:
+    name: ISC
+    url: https://opensource.org/licenses/ISC
 
 servers:
   - url: http://localhost:3000/api/v1
     description: Servidor de Desenvolvimento
-  - url: https://api.exemplo.com/v1
-    description: Servidor de Produção
+  - url: https://bff-levaja.azurewebsites.net/api/v1
+    description: Servidor de Produção (Azure)
 
 tags:
+  - name: Health
+    description: Verificação de saúde do serviço
   - name: Usuários
-    description: Operações relacionadas a usuários
-  - name: Lotes de Produtos
-    description: Operações relacionadas a lotes de produtos
+    description: Operações de usuários (proxy para micro-azure)
+  - name: Produtos
+    description: Operações de produtos (proxy para micro-mongo)
+  - name: Agregação
+    description: Endpoints que agregam dados de múltiplas fontes
+  - name: Estatísticas
+    description: Consultas a Azure Functions de auditoria e relatórios
+  - name: Azure
+    description: Integração com Azure Functions e Service Bus
 
 paths:
-  /usuarios:
+  /health:
     get:
       tags:
-        - Usuários
-      summary: Listar todos os usuários
-      description: Retorna uma lista paginada de usuários
-      parameters:
-        - name: limit
-          in: query
-          description: Número máximo de registros por página
-          schema:
-            type: integer
-            default: 10
-            minimum: 1
-            maximum: 100
-        - name: offset
-          in: query
-          description: Número de registros a pular
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
+        - Health
+      summary: Health check
+      description: Verifica se o serviço está operacional
       responses:
         '200':
-          description: Lista de usuários retornada com sucesso
+          description: Serviço operacional
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Usuario'
-                  total:
-                    type: integer
-                    example: 50
-                  limit:
-                    type: integer
-                    example: 10
-                  offset:
-                    type: integer
-                    example: 0
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+                    example: 12345.67
+                  service:
+                    type: string
+                    example: BFF API Gateway
+
+  # ========== USUÁRIOS ==========
+  /usuarios:
+    get:
+      tags:
+        - Usuários
+      summary: Listar usuários
+      description: Lista todos os usuários com paginação
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+      responses:
+        '200':
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
         '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/InternalError'
     
     post:
       tags:
         - Usuários
-      summary: Criar novo usuário
+      summary: Criar usuário
       description: Cria um novo usuário no sistema
       requestBody:
         required: true
@@ -89,22 +116,15 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/InternalError'
 
   /usuarios/{id}:
     get:
       tags:
         - Usuários
       summary: Buscar usuário por ID
-      description: Retorna um usuário específico pelo ID
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID do usuário
-          schema:
-            type: string
-            example: "507f1f77bcf86cd799439011"
+        - $ref: '#/components/parameters/idParam'
       responses:
         '200':
           description: Usuário encontrado
@@ -114,22 +134,13 @@ paths:
                 $ref: '#/components/schemas/Usuario'
         '404':
           $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
     
     put:
       tags:
         - Usuários
       summary: Atualizar usuário
-      description: Atualiza os dados de um usuário existente
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID do usuário
-          schema:
-            type: string
-            example: "507f1f77bcf86cd799439011"
+        - $ref: '#/components/parameters/idParam'
       requestBody:
         required: true
         content:
@@ -138,96 +149,56 @@ paths:
               $ref: '#/components/schemas/UsuarioInput'
       responses:
         '200':
-          description: Usuário atualizado com sucesso
+          description: Usuário atualizado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Usuario'
-        '400':
-          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
     
     delete:
       tags:
         - Usuários
       summary: Deletar usuário
-      description: Remove um usuário do sistema
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID do usuário
-          schema:
-            type: string
-            example: "507f1f77bcf86cd799439011"
+        - $ref: '#/components/parameters/idParam'
       responses:
         '204':
           description: Usuário deletado com sucesso
         '404':
           $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
 
+  # ========== PRODUTOS ==========
   /lotes-produtos:
     get:
       tags:
-        - Lotes de Produtos
-      summary: Listar todos os lotes de produtos
-      description: Retorna uma lista paginada de lotes de produtos
+        - Produtos
+      summary: Listar produtos
+      description: Lista todos os lotes de produtos com paginação
       parameters:
-        - name: limit
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+        - name: ativo
           in: query
-          description: Número máximo de registros por página
+          description: Filtrar por status ativo
           schema:
-            type: integer
-            default: 10
-            minimum: 1
-            maximum: 100
-        - name: offset
-          in: query
-          description: Número de registros a pular
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
-        - name: categoria
-          in: query
-          description: Filtrar por categoria
-          schema:
-            type: string
-            example: "Alimentos"
+            type: boolean
       responses:
         '200':
-          description: Lista de lotes de produtos retornada com sucesso
+          description: Lista de produtos
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/LoteProduto'
-                  total:
-                    type: integer
-                    example: 120
-                  limit:
-                    type: integer
-                    example: 10
-                  offset:
-                    type: integer
-                    example: 0
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoteProduto'
     
     post:
       tags:
-        - Lotes de Produtos
-      summary: Criar novo lote de produto
-      description: Cria um novo lote de produto no sistema
+        - Produtos
+      summary: Criar produto
+      description: Cria um novo lote de produto
       requestBody:
         required: true
         content:
@@ -236,55 +207,37 @@ paths:
               $ref: '#/components/schemas/LoteProdutoInput'
       responses:
         '201':
-          description: Lote de produto criado com sucesso
+          description: Produto criado com sucesso
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoteProduto'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
 
   /lotes-produtos/{id}:
     get:
       tags:
-        - Lotes de Produtos
-      summary: Buscar lote de produto por ID
-      description: Retorna um lote de produto específico pelo ID
+        - Produtos
+      summary: Buscar produto por ID
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID do lote de produto
-          schema:
-            type: string
-            example: "507f1f77bcf86cd799439011"
+        - $ref: '#/components/parameters/idParam'
       responses:
         '200':
-          description: Lote de produto encontrado
+          description: Produto encontrado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoteProduto'
         '404':
           $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
     
     put:
       tags:
-        - Lotes de Produtos
-      summary: Atualizar lote de produto
-      description: Atualiza os dados de um lote de produto existente
+        - Produtos
+      summary: Atualizar produto
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID do lote de produto
-          schema:
-            type: string
-            example: "507f1f77bcf86cd799439011"
+        - $ref: '#/components/parameters/idParam'
       requestBody:
         required: true
         content:
@@ -293,53 +246,30 @@ paths:
               $ref: '#/components/schemas/LoteProdutoInput'
       responses:
         '200':
-          description: Lote de produto atualizado com sucesso
+          description: Produto atualizado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoteProduto'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
     
     delete:
       tags:
-        - Lotes de Produtos
-      summary: Deletar lote de produto
-      description: Remove um lote de produto do sistema
+        - Produtos
+      summary: Deletar produto
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID do lote de produto
-          schema:
-            type: string
-            example: "507f1f77bcf86cd799439011"
+        - $ref: '#/components/parameters/idParam'
       responses:
         '204':
-          description: Lote de produto deletado com sucesso
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: Produto deletado com sucesso
 
   /lotes-produtos/{id}/estoque:
     patch:
       tags:
-        - Lotes de Produtos
-      summary: Atualizar estoque do lote
-      description: Atualiza apenas a quantidade em estoque de um lote de produto
+        - Produtos
+      summary: Atualizar estoque
+      description: Atualiza apenas a quantidade em estoque do produto
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID do lote de produto
-          schema:
-            type: string
-            example: "507f1f77bcf86cd799439011"
+        - $ref: '#/components/parameters/idParam'
       requestBody:
         required: true
         content:
@@ -347,67 +277,383 @@ paths:
             schema:
               type: object
               required:
-                - estoque
+                - quantidade
               properties:
-                estoque:
+                quantidade:
                   type: integer
                   minimum: 0
                   example: 150
       responses:
         '200':
-          description: Estoque atualizado com sucesso
+          description: Estoque atualizado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoteProduto'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+
+  # ========== AGREGAÇÃO ==========
+  /agregacao/dashboard:
+    get:
+      tags:
+        - Agregação
+      summary: Dashboard completo
+      description: Agrega dados de usuários, produtos, estatísticas e relatórios
+      responses:
+        '200':
+          description: Dados do dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardData'
         '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/InternalError'
+
+  /agregacao/usuarios-completo:
+    get:
+      tags:
+        - Agregação
+      summary: Usuários com auditoria
+      description: Lista usuários com dados de auditoria
+      responses:
+        '200':
+          description: Usuários com auditoria
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuarios:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Usuario'
+                  auditoria:
+                    type: object
+
+  /agregacao/produtos-completo:
+    get:
+      tags:
+        - Agregação
+      summary: Produtos com auditoria
+      description: Lista produtos com relatórios de auditoria
+      responses:
+        '200':
+          description: Produtos com auditoria
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  produtos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoteProduto'
+                  auditoria:
+                    type: object
+
+  # ========== ESTATÍSTICAS E AUDITORIA ==========
+  /statistics/usuarios:
+    get:
+      tags:
+        - Estatísticas
+      summary: Estatísticas de usuários
+      description: Retorna estatísticas de auditoria de usuários da Azure Function
+      responses:
+        '200':
+          description: Estatísticas de usuários
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Statistics'
+
+  /statistics/usuarios-auditoria:
+    get:
+      tags:
+        - Estatísticas
+      summary: Logs de auditoria de usuários
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+      responses:
+        '200':
+          description: Lista de logs de auditoria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /statistics/usuarios-auditoria/{id}:
+    get:
+      tags:
+        - Estatísticas
+      summary: Auditoria específica de usuário
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Detalhes da auditoria
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /statistics/produtos-auditoria:
+    get:
+      tags:
+        - Estatísticas
+      summary: Logs de auditoria de produtos
+      parameters:
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/offsetParam'
+      responses:
+        '200':
+          description: Lista de logs de auditoria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /statistics/produtos-auditoria/{id}:
+    get:
+      tags:
+        - Estatísticas
+      summary: Auditoria específica de produto
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Detalhes da auditoria
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /statistics/relatorios/estoque-baixo:
+    get:
+      tags:
+        - Estatísticas
+      summary: Relatório de estoque baixo
+      description: Lista produtos com estoque abaixo do mínimo (retorna array para compatibilidade)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Produtos com estoque baixo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoteProduto'
+
+  /statistics/relatorios/estoque-baixo-completo:
+    get:
+      tags:
+        - Estatísticas
+      summary: Relatório completo de estoque baixo
+      description: Inclui produtos, alertas e dados de verificação
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Relatório completo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  produtos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoteProduto'
+                  alertas:
+                    type: array
+                    items:
+                      type: object
+                  verification:
+                    type: object
+
+  /statistics/relatorios/vencimentos-proximos:
+    get:
+      tags:
+        - Estatísticas
+      summary: Relatório de vencimentos próximos
+      description: Lista produtos próximos do vencimento (retorna array para compatibilidade)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Produtos com vencimento próximo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoteProduto'
+
+  /statistics/relatorios/vencimentos-proximos-completo:
+    get:
+      tags:
+        - Estatísticas
+      summary: Relatório completo de vencimentos próximos
+      description: Inclui produtos próximos, vencidos e dados de verificação
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Relatório completo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  produtosProximos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoteProduto'
+                  produtosVencidos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoteProduto'
+                  verification:
+                    type: object
+
+  # ========== AZURE INTEGRATION ==========
+  /azure/function1:
+    post:
+      tags:
+        - Azure
+      summary: Processar com Function 1
+      description: Envia dados para Azure Function 1 (Usuários Auditoria)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Processado com sucesso
+
+  /azure/function2:
+    post:
+      tags:
+        - Azure
+      summary: Notificar com Function 2
+      description: Envia dados para Azure Function 2 (Produtos Auditoria)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Notificado com sucesso
+
+  /azure/send-message:
+    post:
+      tags:
+        - Azure
+      summary: Enviar mensagem ao Service Bus
+      description: Publica uma mensagem no Azure Service Bus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                queueName:
+                  type: string
+                  example: usuarios-queue
+                message:
+                  type: object
+      responses:
+        '200':
+          description: Mensagem enviada
+
+  /azure/send-batch:
+    post:
+      tags:
+        - Azure
+      summary: Enviar lote de mensagens
+      description: Publica múltiplas mensagens no Azure Service Bus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                queueName:
+                  type: string
+                messages:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Lote enviado
+
+  /azure/process-and-notify:
+    post:
+      tags:
+        - Azure
+      summary: Processar e notificar
+      description: Fluxo completo que processa via Function e notifica via Service Bus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Processado e notificado
 
 components:
   schemas:
     Usuario:
       type: object
-      required:
-        - id
-        - nome
-        - email
       properties:
         id:
-          type: string
-          description: Identificador único do usuário
-          example: "507f1f77bcf86cd799439011"
+          type: integer
+          description: ID do usuário
+          example: 1
         nome:
           type: string
-          description: Nome completo do usuário
-          minLength: 3
-          maxLength: 100
-          example: "João Silva"
+          description: Nome completo
+          example: João Silva
         email:
           type: string
           format: email
           description: Email do usuário
-          example: "joao.silva@exemplo.com"
-        senha:
-          type: string
-          format: password
-          description: Senha do usuário (retornada apenas em casos específicos)
-          writeOnly: true
-        createdAt:
+          example: joao@exemplo.com
+        data_criacao:
           type: string
           format: date-time
-          description: Data de criação do registro
-          readOnly: true
-          example: "2025-10-26T15:30:00Z"
-        updatedAt:
-          type: string
-          format: date-time
-          description: Data da última atualização
-          readOnly: true
-          example: "2025-10-26T15:30:00Z"
+          description: Data de criação
+          example: '2025-11-10T00:00:00Z'
 
     UsuarioInput:
       type: object
@@ -418,127 +664,176 @@ components:
       properties:
         nome:
           type: string
-          description: Nome completo do usuário
           minLength: 3
           maxLength: 100
-          example: "João Silva"
+          example: João Silva
         email:
           type: string
           format: email
-          description: Email do usuário
-          example: "joao.silva@exemplo.com"
+          example: joao@exemplo.com
         senha:
           type: string
           format: password
-          description: Senha do usuário
-          minLength: 8
-          example: "SenhaSegura123!"
+          minLength: 6
+          example: senha123
 
     LoteProduto:
       type: object
-      required:
-        - id
-        - nome
-        - categoria
-        - estoque
-        - valor
       properties:
-        id:
+        _id:
           type: string
-          description: Identificador único do lote de produto
-          example: "507f1f77bcf86cd799439011"
+          description: ID do MongoDB
+          example: 507f1f77bcf86cd799439011
         nome:
           type: string
-          description: Nome do produto
-          minLength: 3
-          maxLength: 150
-          example: "Arroz Integral 1kg"
-        categoria:
+          example: Arroz 5kg
+        descricao:
           type: string
-          description: Categoria do produto
-          example: "Alimentos"
-        estoque:
+          example: Arroz branco tipo 1
+        quantidade:
           type: integer
-          description: Quantidade disponível em estoque
-          minimum: 0
-          example: 500
+          example: 100
+        valor:
+          type: number
+          example: 25.90
+        lote_id:
+          type: string
+          example: LOTE-2025-001
         validade:
           type: string
           format: date
-          description: Data de validade do lote
-          example: "2026-12-31"
-        valor:
-          type: number
-          format: double
-          description: Valor unitário do produto em reais
-          minimum: 0
-          example: 15.99
-        createdAt:
-          type: string
-          format: date-time
-          description: Data de criação do registro
-          readOnly: true
-          example: "2025-10-26T15:30:00Z"
-        updatedAt:
-          type: string
-          format: date-time
-          description: Data da última atualização
-          readOnly: true
-          example: "2025-10-26T15:30:00Z"
+          example: '2026-12-31'
+        ativo:
+          type: boolean
+          example: true
 
     LoteProdutoInput:
       type: object
       required:
         - nome
-        - categoria
-        - estoque
+        - descricao
+        - quantidade
         - valor
+        - lote_id
+        - validade
       properties:
         nome:
           type: string
-          description: Nome do produto
           minLength: 3
-          maxLength: 150
-          example: "Arroz Integral 1kg"
-        categoria:
+          example: Arroz 5kg
+        descricao:
           type: string
-          description: Categoria do produto
-          example: "Alimentos"
-        estoque:
+          example: Arroz branco tipo 1
+        quantidade:
           type: integer
-          description: Quantidade disponível em estoque
           minimum: 0
-          example: 500
+          example: 100
+        valor:
+          type: number
+          minimum: 0
+          example: 25.90
+        lote_id:
+          type: string
+          example: LOTE-2025-001
         validade:
           type: string
           format: date
-          description: Data de validade do lote (opcional)
-          example: "2026-12-31"
-        valor:
-          type: number
-          format: double
-          description: Valor unitário do produto em reais
-          minimum: 0
-          example: 15.99
+          example: '2026-12-31'
+        ativo:
+          type: boolean
+          default: true
+
+    DashboardData:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+          example: 150
+        totalProducts:
+          type: integer
+          example: 500
+        userStatistics:
+          type: object
+          properties:
+            statistics:
+              type: object
+              properties:
+                totalUsuariosCriados:
+                  type: integer
+                  example: 150
+                usuariosCriadosHoje:
+                  type: integer
+                  example: 5
+            verification:
+              type: object
+              nullable: true
+        lowStockAlerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoteProduto'
+        nearExpirationAlerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoteProduto'
+
+    Statistics:
+      type: object
+      properties:
+        totalCreated:
+          type: integer
+          example: 150
+        createdToday:
+          type: integer
+          example: 5
+        lastProcessed:
+          type: string
+          format: date-time
+          nullable: true
+        usuariosPorDia:
+          type: array
+          items:
+            type: object
+        verification:
+          type: object
+          nullable: true
 
     Error:
       type: object
-      required:
-        - message
       properties:
         message:
           type: string
-          description: Mensagem de erro
-          example: "Erro ao processar requisição"
+          example: Erro ao processar requisição
         code:
           type: string
-          description: Código do erro
-          example: "ERR_VALIDATION"
-        details:
-          type: array
-          description: Detalhes adicionais do erro
-          items:
-            type: string
+          example: INTERNAL_ERROR
+
+  parameters:
+    limitParam:
+      name: limit
+      in: query
+      description: Número máximo de resultados
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+
+    offsetParam:
+      name: offset
+      in: query
+      description: Número de resultados a pular
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+
+    idParam:
+      name: id
+      in: path
+      required: true
+      description: ID do recurso
+      schema:
+        type: string
 
   responses:
     BadRequest:
@@ -548,11 +843,8 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
           example:
-            message: "Dados inválidos na requisição"
-            code: "BAD_REQUEST"
-            details:
-              - "O campo 'email' é obrigatório"
-              - "O campo 'estoque' deve ser maior ou igual a 0"
+            message: Dados inválidos
+            code: BAD_REQUEST
 
     NotFound:
       description: Recurso não encontrado
@@ -561,15 +853,15 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
           example:
-            message: "Recurso não encontrado"
-            code: "NOT_FOUND"
+            message: Recurso não encontrado
+            code: NOT_FOUND
 
-    InternalServerError:
+    InternalError:
       description: Erro interno do servidor
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
           example:
-            message: "Erro interno do servidor"
-            code: "INTERNAL_ERROR"
+            message: Erro interno do servidor
+            code: INTERNAL_ERROR
