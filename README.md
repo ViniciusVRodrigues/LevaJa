@@ -1,13 +1,16 @@
 # LevaJá - Complete Event-Driven Microservices Architecture
 
-# Equipe
-- Evelyn Costa
-- João Victor Morcelli
-- Natália Molini
-- Nicholas Tsuru
-- Vinícius Veiga
-
 Sistema completo de gerenciamento de usuários e lotes de produtos com arquitetura de microserviços orientada a eventos, implementando o padrão API Gateway (BFF), frontend React, e integração completa com Azure Cloud Services.
+
+## 👥 Autores
+
+Este projeto foi desenvolvido como trabalho acadêmico pelos seguintes alunos:
+
+- **Evelyn Costa**
+- **João Victor Morcelli**
+- **Natália Molini**
+- **Nicholas Tsuru**
+- **Vinícius Veiga**
 
 ## 📋 Índice
 
@@ -725,190 +728,6 @@ curl http://localhost:7071/api/statistics
 curl http://localhost:7072/api/produtos-auditoria
 ```
 
-### Testar Fluxo Completo
-
-#### 1. Criar Usuário
-```bash
-curl -X POST http://localhost:3000/api/v1/usuarios \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nome": "João Silva",
-    "email": "joao@exemplo.com",
-    "senha": "senha123"
-  }'
-```
-
-#### 2. Verificar Evento Processado (aguardar alguns segundos)
-```bash
-curl http://localhost:7071/api/usuarios-auditoria
-```
-
-#### 3. Criar Produto
-```bash
-curl -X POST http://localhost:3000/api/v1/lotes-produtos \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nome": "Arroz Integral 1kg",
-    "categoria": "Alimentos",
-    "estoque": 45,
-    "valor": 15.99,
-    "validade": "2025-12-31"
-  }'
-```
-
-#### 4. Verificar Alertas (estoque baixo)
-```bash
-curl http://localhost:7072/api/relatorios/estoque-baixo
-```
-
-#### 5. Consultar Dashboard Agregado
-```bash
-curl http://localhost:3000/api/v1/agregacao/dashboard
-```
-
-## 🐛 Troubleshooting
-
-### Problema: Containers não estão lendo variáveis de ambiente / Erro de conexão com banco de dados
-**Causa**: Arquivos `.env` são intencionalmente **excluídos** das imagens Docker (via `.dockerignore`) por segurança. Variáveis de ambiente devem ser passadas em **runtime**.
-
-**Solução - Desenvolvimento Local**:
-
-**Opção 1: Usar docker-compose (Recomendado)**
-```bash
-cd micro-azure  # ou micro-mongo, micro-bff
-cp .env.example .env
-# Editar .env com suas configurações
-docker-compose up
-```
-
-O `docker-compose.yml` já está configurado com `env_file: [.env]` para carregar automaticamente as variáveis.
-
-**Opção 2: Usar --env-file com docker run**
-```bash
-docker run --env-file .env -p 3001:3001 micro-azure
-```
-
-**Opção 3: Passar variáveis individualmente**
-```bash
-docker run \
-  -e AZURE_SQL_SERVER=myserver.database.windows.net \
-  -e AZURE_SQL_DATABASE=mydb \
-  -e AZURE_SQL_USER=admin \
-  -e AZURE_SQL_PASSWORD=mypassword \
-  -p 3001:3001 micro-azure
-```
-
-**Solução - Azure (Produção)**:
-No Azure App Service, as variáveis de ambiente são configuradas via:
-- Portal: App Service → Configuration → Application Settings
-- CLI: `az webapp config appsettings set --settings KEY=VALUE`
-
-**Não é necessário (nem recomendado) incluir arquivos `.env` em produção.**
-
-**Verificar se as variáveis estão carregadas:**
-```bash
-# Entrar no container em execução
-docker exec -it <container-name> sh
-# Ver variáveis de ambiente
-env | grep AZURE
-```
-
-### Problema: Frontend deployment falha com erro "EBADENGINE Unsupported engine"
-**Causa**: Azure Static Web Apps está usando Node.js v18, mas o projeto requer v20+
-
-**Solução**: 
-1. Verificar que o arquivo `.nvmrc` existe em `mfe-admin/` com conteúdo `20`
-2. Verificar que `package.json` tem o campo `engines` especificando Node >=20.0.0
-3. Se usando GitHub Actions, adicionar ao workflow:
-```yaml
-env:
-  NODE_VERSION: '20'
-```
-4. Limpar cache do Azure e refazer deploy
-```bash
-# Deletar e recriar Static Web App
-az staticwebapp delete --name levaja-frontend --resource-group levaja-rg
-# Recriar com configuração correta
-```
-
-### Problema: Containers não iniciam no Azure
-**Solução**: Verificar logs do container
-```bash
-az webapp log tail --name levaja-micro-azure --resource-group levaja-rg
-```
-
-### Problema: Service Bus não recebe eventos
-**Solução**: Verificar connection string e permissões
-```bash
-# Testar envio direto
-curl -X POST http://localhost:3000/api/v1/azure/send-message \
-  -H "Content-Type: application/json" \
-  -d '{"message": "teste"}'
-```
-
-### Problema: Azure Functions não disparam com Service Bus
-**Solução**: 
-1. Verificar se a fila existe
-2. Verificar connection string nas configurações
-3. Verificar logs da Function
-```bash
-func azure functionapp logstream levaja-func-usuarios
-```
-
-### Problema: CORS errors no frontend
-**Solução**: Adicionar origem do frontend no .env do BFF
-```env
-CORS_ORIGIN=https://seu-frontend.azurewebsites.net,http://localhost:5173
-```
-
-### Problema: Connection timeout para SQL Server
-**Solução**: Verificar regras de firewall
-```bash
-az sql server firewall-rule create \
-  --resource-group levaja-rg \
-  --server levaja-sql-server \
-  --name AllowMyIP \
-  --start-ip-address SEU_IP \
-  --end-ip-address SEU_IP
-```
-
-## 📊 Monitoramento
-
-### Application Insights
-```bash
-# Habilitar Application Insights para todos os serviços
-az monitor app-insights component create \
-  --app levaja-insights \
-  --location brazilsouth \
-  --resource-group levaja-rg
-
-# Configurar nos serviços
-az webapp config appsettings set \
-  --name levaja-bff \
-  --resource-group levaja-rg \
-  --settings APPINSIGHTS_INSTRUMENTATIONKEY="sua-key"
-```
-
-## 💰 Estimativa de Custos (Azure)
-
-### Tier Básico (Desenvolvimento/Teste)
-- **App Service Plan (B1)**: ~R$ 60/mês (3 containers)
-- **Azure SQL (S0)**: ~R$ 30/mês × 2 = R$ 60/mês
-- **Cosmos DB (400 RU/s)**: ~R$ 60/mês
-- **Service Bus (Basic)**: ~R$ 2/mês
-- **Functions (Consumption)**: ~R$ 0 (free tier)
-- **Container Registry**: ~R$ 20/mês
-- **Total**: ~R$ 200-250/mês
-
-### Tier Produção (Escalável)
-- **App Service Plan (P1V2)**: ~R$ 280/mês
-- **Azure SQL (S2)**: ~R$ 180/mês × 2 = R$ 360/mês
-- **Cosmos DB (1000 RU/s)**: ~R$ 150/mês
-- **Service Bus (Standard)**: ~R$ 40/mês
-- **Functions (Premium)**: ~R$ 350/mês
-- **Application Insights**: ~R$ 50/mês
-- **Total**: ~R$ 1200-1500/mês
-
 ## 📝 Variáveis de Ambiente - Resumo
 
 ### micro-bff
@@ -996,39 +815,8 @@ MONGODB_URI=mongodb://levaja-cosmos:...@levaja-cosmos.mongo.cosmos.azure.com:102
 - **function-usuarios-auditoria/tests/architecture.test.js**: Testes de arquitetura da function
 - **function-produtos-auditoria/tests/architecture.test.js**: Testes de arquitetura da function
 
-## 🔧 Guias de Troubleshooting
-
-### Problema: Frontend não faz build
-**Solução**: Consulte **mfe-admin/DEPLOY.md**
-```bash
-cd mfe-admin
-npm install
-npm run build
-```
-
-### Problema: Microserviço Azure desconecta do SQL
-**Solução**: Consulte **micro-azure/TROUBLESHOOTING.md**
-- ✅ Auto-reconexão implementada
-- ✅ Keep-alive a cada 4 minutos
-- ✅ Pool otimizado com min=2 conexões
-- ✅ Timeouts aumentados para 5 minutos
-
-## 👥 Autores
-
-Este projeto foi desenvolvido como trabalho acadêmico pelos seguintes alunos:
-
-- **Vinícius Viana Rodrigues**
-
-*Caso haja outros membros da equipe, favor adicionar seus nomes acima.*
-
 ## 🤝 Suporte
 
 Para problemas ou dúvidas, consulte a documentação específica de cada componente ou abra uma issue no repositório.
-
-## 📄 Licença
-
-[Incluir licença do projeto]
-
----
 
 **Desenvolvido com ❤️ para o projeto LevaJá**
