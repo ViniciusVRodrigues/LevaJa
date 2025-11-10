@@ -14,18 +14,19 @@ const config = {
       trustServerCertificate: process.env.NODE_ENV === 'development',
       // Configurações para prevenir timeouts
       enableArithAbort: true,
-      connectTimeout: 30000, // 30 segundos
-      requestTimeout: 30000   // 30 segundos
+      connectTimeout: 60000, // 60 segundos (aumentado)
+      requestTimeout: 60000, // 60 segundos (aumentado)
+      cancelTimeout: 5000
     },
     pool: {
       max: 10,
-      min: 2, // Mantém pelo menos 2 conexões ativas
-      idleTimeoutMillis: 300000, // 5 minutos (aumentado de 30s)
-      acquireTimeoutMillis: 30000,
-      createTimeoutMillis: 30000,
+      min: 0, // Não força conexões no startup (lazy)
+      idleTimeoutMillis: 600000, // 10 minutos
+      acquireTimeoutMillis: 60000, // 60 segundos (aumentado)
+      createTimeoutMillis: 60000, // 60 segundos (aumentado)
       destroyTimeoutMillis: 5000,
       reapIntervalMillis: 1000,
-      createRetryIntervalMillis: 200
+      createRetryIntervalMillis: 500
     }
   },
   

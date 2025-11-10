@@ -5,13 +5,23 @@ let pool = null;
 let isConnecting = false;
 let connectionPromise = null;
 let lastConnectionAttempt = 0;
-const MIN_RECONNECT_INTERVAL = 3000; // 3 segundos entre tentativas
+const MIN_RECONNECT_INTERVAL = 5000; // 5 segundos entre tentativas
 let tableInitialized = false;
 
 /**
- * Inicializa conexão com Azure SQL (lazy - só quando necessário)
+ * Aguarda com timeout
  */
-async function connect() {
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Inicializa conexão com Azure SQL com retry automático
+ */
+async function connect(retryCount = 0) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 5000; // 5 segundos entre retries
+  
   try {
     // Se já está conectando, aguarda a promessa existente
     if (isConnecting && connectionPromise) {
@@ -24,7 +34,7 @@ async function connect() {
     if (now - lastConnectionAttempt < MIN_RECONNECT_INTERVAL) {
       const waitTime = MIN_RECONNECT_INTERVAL - (now - lastConnectionAttempt);
       console.log(`⏱️ Aguardando ${waitTime}ms antes de reconectar...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      await sleep(waitTime);
     }
 
     isConnecting = true;
@@ -41,7 +51,7 @@ async function connect() {
       pool = null;
     }
 
-    console.log('🔄 Conectando ao Azure SQL Server...');
+    console.log(`🔄 Conectando ao Azure SQL Server... (tentativa ${retryCount + 1}/${MAX_RETRIES + 1})`);
     
     // Cria nova promessa de conexão
     connectionPromise = sql.connect(config.database);
@@ -69,7 +79,18 @@ async function connect() {
     isConnecting = false;
     connectionPromise = null;
     pool = null;
-    console.error('❌ Erro ao conectar ao Azure SQL:', error.message);
+    
+    console.error(`❌ Erro ao conectar ao Azure SQL (tentativa ${retryCount + 1}):`, error.message);
+    
+    // Retry logic com exponential backoff
+    if (retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAY * Math.pow(2, retryCount); // Exponential backoff
+      console.log(`🔄 Tentando novamente em ${delay / 1000} segundos...`);
+      await sleep(delay);
+      return connect(retryCount + 1);
+    }
+    
+    console.error('❌ Falha após todas as tentativas de conexão');
     throw error;
   }
 }
@@ -109,7 +130,14 @@ async function getPool() {
   try {
     // Verifica se o pool existe e está conectado
     if (pool && pool.connected && pool.healthy) {
-      return pool;
+      // Testa a conexão com uma query simples
+      try {
+        await pool.request().query('SELECT 1 AS test');
+        return pool;
+      } catch (testError) {
+        console.warn('⚠️ Teste de conexão falhou:', testError.message);
+        pool = null; // Invalida o pool
+      }
     }
 
     // Se pool não existe ou está desconectado, cria novo
@@ -121,15 +149,7 @@ async function getPool() {
     return pool;
   } catch (error) {
     console.error('❌ Erro ao obter pool:', error.message);
-    
-    // Em caso de erro, tenta reconectar
-    try {
-      console.log('🔄 Tentando reconectar após erro...');
-      return await connect();
-    } catch (reconnectError) {
-      console.error('❌ Falha na reconexão:', reconnectError.message);
-      throw reconnectError;
-    }
+    throw error;
   }
 }
 
