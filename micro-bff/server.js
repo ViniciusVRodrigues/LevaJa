@@ -1,12 +1,17 @@
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
 const config = require('./config');
 const logger = require('./middleware/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const routes = require('./routes');
 const serviceBusService = require('./services/serviceBusService');
-const { specs, swaggerUi } = require('./swagger');
+
+// Carrega o arquivo swagger.yaml
+const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
 
 /**
  * Servidor Express.js - BFF (Backend for Frontend) API Gateway
@@ -37,14 +42,19 @@ app.use(logger);
 
 // ========== Swagger Documentation ==========
 // Swagger UI disponível em /api-docs
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
-  customCssUrl: 'https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-material.css',
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'BFF API Gateway - LevaJá',
   customfavIcon: 'https://swagger.io/favicon.ico',
   swaggerOptions: {
     persistAuthorization: true,
   },
 }));
+
+// Rota para o arquivo YAML bruto
+app.get('/swagger.yaml', (req, res) => {
+  res.sendFile(path.join(__dirname, 'swagger.yaml'));
+});
 
 // ========== Rotas ==========
 // Rota raiz
