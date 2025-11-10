@@ -1,5 +1,12 @@
 # LevaJá - Complete Event-Driven Microservices Architecture
 
+# Equipe
+- Evelyn Costa
+- João Victor Morcelli
+- Natália Molini
+- Nicholas Tsuru
+- Vinícius Veiga
+
 Sistema completo de gerenciamento de usuários e lotes de produtos com arquitetura de microserviços orientada a eventos, implementando o padrão API Gateway (BFF), frontend React, e integração completa com Azure Cloud Services.
 
 ## 📋 Índice
