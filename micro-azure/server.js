@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const config = require('./config');
 const { connect, close } = require('./db/connection');
 const userRoutes = require('./routes/userRoutes');
+const { specs, swaggerUi } = require('./swagger');
 
 /**
  * Microserviço de Usuários - Azure SQL
@@ -13,13 +14,39 @@ const userRoutes = require('./routes/userRoutes');
 const app = express();
 
 // Middlewares
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Desabilita CSP para Swagger UI funcionar
+}));
 app.use(cors(config.cors));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Health check
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check do serviço
+ *     description: Verifica se o serviço está operacional
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Serviço operacional
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ *                 service:
+ *                   type: string
+ *                   example: micro-azure (usuarios)
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -28,14 +55,40 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  customSiteTitle: 'API Docs - Microserviço Usuários',
+  customCss: '.swagger-ui .topbar { display: none }'
+}));
+
 // Rotas
 app.use('/usuarios', userRoutes);
 
-// Rota raiz
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Informações da API
+ *     description: Retorna informações básicas e endpoints disponíveis
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Informações da API
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 endpoints:
+ *                   type: object
+ */
 app.get('/', (req, res) => {
   res.json({
     message: 'Microserviço de Usuários - Azure SQL',
     endpoints: {
+      swagger: '/api-docs',
       health: '/health',
       usuarios: '/usuarios'
     }
