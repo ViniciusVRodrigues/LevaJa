@@ -2,26 +2,95 @@ const sql = require('mssql');
 const config = require('../config');
 
 let pool = null;
+let isConnecting = false;
+let connectionPromise = null;
+let lastConnectionAttempt = 0;
+const MIN_RECONNECT_INTERVAL = 5000; // 5 segundos entre tentativas
+let tableInitialized = false;
 
 /**
- * Inicializa conexão com Azure SQL
+ * Aguarda com timeout
  */
-async function connect() {
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Inicializa conexão com Azure SQL com retry automático
+ */
+async function connect(retryCount = 0) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 5000; // 5 segundos entre retries
+  
   try {
-    if (pool) {
-      return pool;
+    // Se já está conectando, aguarda a promessa existente
+    if (isConnecting && connectionPromise) {
+      console.log('⏳ Aguardando conexão em andamento...');
+      return await connectionPromise;
     }
 
-    console.log('Conectando ao Azure SQL Server...');
-    pool = await sql.connect(config.database);
-    console.log('✓ Conectado ao Azure SQL Server');
+    // Evita reconexões muito frequentes
+    const now = Date.now();
+    if (now - lastConnectionAttempt < MIN_RECONNECT_INTERVAL) {
+      const waitTime = MIN_RECONNECT_INTERVAL - (now - lastConnectionAttempt);
+      console.log(`⏱️ Aguardando ${waitTime}ms antes de reconectar...`);
+      await sleep(waitTime);
+    }
 
-    // Cria tabela se não existir
-    await initializeDatabase();
+    isConnecting = true;
+    lastConnectionAttempt = Date.now();
 
+    // Fecha pool anterior se existir
+    if (pool) {
+      try {
+        await pool.close();
+        console.log('🔌 Pool anterior fechado');
+      } catch (err) {
+        console.warn('⚠️ Erro ao fechar pool anterior:', err.message);
+      }
+      pool = null;
+    }
+
+    console.log(`🔄 Conectando ao Azure SQL Server... (tentativa ${retryCount + 1}/${MAX_RETRIES + 1})`);
+    
+    // Cria nova promessa de conexão
+    connectionPromise = sql.connect(config.database);
+    pool = await connectionPromise;
+    
+    // Handler para detectar desconexões
+    pool.on('error', (err) => {
+      console.error('❌ Erro na conexão do pool:', err.message);
+      pool = null;
+      tableInitialized = false;
+    });
+
+    console.log('✅ Conectado ao Azure SQL Server');
+
+    // Inicializa tabela apenas uma vez
+    if (!tableInitialized) {
+      await initializeDatabase();
+      tableInitialized = true;
+    }
+
+    isConnecting = false;
+    connectionPromise = null;
     return pool;
   } catch (error) {
-    console.error('Erro ao conectar ao Azure SQL:', error.message);
+    isConnecting = false;
+    connectionPromise = null;
+    pool = null;
+    
+    console.error(`❌ Erro ao conectar ao Azure SQL (tentativa ${retryCount + 1}):`, error.message);
+    
+    // Retry logic com exponential backoff
+    if (retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAY * Math.pow(2, retryCount); // Exponential backoff
+      console.log(`🔄 Tentando novamente em ${delay / 1000} segundos...`);
+      await sleep(delay);
+      return connect(retryCount + 1);
+    }
+    
+    console.error('❌ Falha após todas as tentativas de conexão');
     throw error;
   }
 }
@@ -46,20 +115,42 @@ async function initializeDatabase() {
     `;
 
     await pool.request().query(createTableQuery);
-    console.log('✓ Tabela usuarios verificada/criada');
+    console.log('✅ Tabela usuarios verificada/criada');
   } catch (error) {
-    console.error('Erro ao inicializar database:', error.message);
+    console.error('❌ Erro ao inicializar database:', error.message);
+    throw error;
   }
 }
 
 /**
- * Obtém pool de conexão
+ * Obtém pool de conexão (com auto-reconexão sob demanda)
+ * Esta função é chamada toda vez que um request precisa acessar o banco
  */
-function getPool() {
-  if (!pool) {
-    throw new Error('Database não conectado. Chame connect() primeiro.');
+async function getPool() {
+  try {
+    // Verifica se o pool existe e está conectado
+    if (pool && pool.connected && pool.healthy) {
+      // Testa a conexão com uma query simples
+      try {
+        await pool.request().query('SELECT 1 AS test');
+        return pool;
+      } catch (testError) {
+        console.warn('⚠️ Teste de conexão falhou:', testError.message);
+        pool = null; // Invalida o pool
+      }
+    }
+
+    // Se pool não existe ou está desconectado, cria novo
+    if (!pool || !pool.connected) {
+      console.log('🔄 Pool não disponível. Conectando...');
+      return await connect();
+    }
+
+    return pool;
+  } catch (error) {
+    console.error('❌ Erro ao obter pool:', error.message);
+    throw error;
   }
-  return pool;
 }
 
 /**
@@ -67,9 +158,14 @@ function getPool() {
  */
 async function close() {
   if (pool) {
-    await pool.close();
-    pool = null;
-    console.log('Conexão com Azure SQL fechada');
+    try {
+      await pool.close();
+      pool = null;
+      tableInitialized = false;
+      console.log('🔌 Conexão com Azure SQL fechada');
+    } catch (err) {
+      console.error('❌ Erro ao fechar conexão:', err.message);
+    }
   }
 }
 

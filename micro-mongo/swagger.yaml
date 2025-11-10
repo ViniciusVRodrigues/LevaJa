@@ -1,0 +1,623 @@
+openapi: 3.0.3
+info:
+  title: Microserviço de Lotes de Produtos - MongoDB
+  description: |
+    API REST para gerenciamento de lotes de produtos usando MongoDB.
+    
+    Este microserviço faz parte da arquitetura de microserviços do projeto LevaJa e é responsável por:
+    - CRUD completo de lotes de produtos
+    - Controle de estoque com operação PATCH dedicada
+    - Armazenamento em MongoDB
+    - Validação de dados de entrada
+    - Filtros por status ativo/inativo
+    - Health check para monitoramento
+    
+    ## Arquitetura
+    - **Clean Architecture**: Separação clara entre Controllers, Services e Persistência
+    - **Vertical Slice**: Feature completa de produtos isolada
+    - **MongoDB**: NoSQL para flexibilidade de schema
+  version: 1.0.0
+  contact:
+    name: Vinícius Viana Rodrigues
+    email: viniciusvrodrigues@example.com
+
+servers:
+  - url: http://localhost:3003
+    description: Servidor de desenvolvimento local
+  - url: https://micro-mongo-produtos.azurewebsites.net
+    description: Servidor de produção Azure
+
+tags:
+  - name: Lotes de Produtos
+    description: Operações CRUD de lotes de produtos
+  - name: Health
+    description: Health check e informações do serviço
+
+paths:
+  /:
+    get:
+      tags:
+        - Health
+      summary: Informações do serviço
+      description: Retorna informações básicas sobre o microserviço e seus endpoints disponíveis
+      responses:
+        '200':
+          description: Informações do serviço
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Microserviço de Lotes de Produtos - MongoDB
+                  endpoints:
+                    type: object
+                    properties:
+                      health:
+                        type: string
+                        example: /health
+                      lotesProdutos:
+                        type: string
+                        example: /lotes-produtos
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Verifica o status do serviço
+      responses:
+        '200':
+          description: Serviço operacional
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: micro-mongo (lotes-produtos)
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2025-11-10T00:00:00.000Z'
+
+  /lotes-produtos:
+    get:
+      tags:
+        - Lotes de Produtos
+      summary: Lista todos os lotes de produtos
+      description: |
+        Retorna uma lista paginada de lotes de produtos cadastrados no sistema.
+        
+        **Paginação:**
+        - Use `limit` para definir quantos registros retornar por página
+        - Use `offset` para pular registros (útil para páginas subsequentes)
+        
+        **Filtros:**
+        - Use `ativo=true` para retornar apenas produtos ativos
+        - Use `ativo=false` para retornar apenas produtos inativos
+        - Omita o parâmetro `ativo` para retornar todos
+        
+        **Exemplo:** `?limit=10&offset=0&ativo=true` retorna os primeiros 10 produtos ativos
+      operationId: listLotesProdutos
+      parameters:
+        - name: limit
+          in: query
+          description: Número máximo de registros a retornar
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+            example: 10
+        - name: offset
+          in: query
+          description: Número de registros a pular (para paginação)
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+        - name: ativo
+          in: query
+          description: Filtra por status ativo/inativo
+          required: false
+          schema:
+            type: boolean
+            example: true
+      responses:
+        '200':
+          description: Lista de produtos retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoteProduto'
+              example:
+                - _id: '507f1f77bcf86cd799439011'
+                  nome: Produto A
+                  descricao: Descrição do Produto A
+                  quantidade: 100
+                  valor: 25.50
+                  lote_id: LOTE-001
+                  validade: '2025-12-31'
+                  ativo: true
+                  createdAt: '2025-11-10T00:00:00.000Z'
+                  updatedAt: '2025-11-10T00:00:00.000Z'
+                - _id: '507f1f77bcf86cd799439012'
+                  nome: Produto B
+                  descricao: Descrição do Produto B
+                  quantidade: 50
+                  valor: 15.75
+                  lote_id: LOTE-002
+                  validade: '2026-06-30'
+                  ativo: true
+                  createdAt: '2025-11-09T00:00:00.000Z'
+                  updatedAt: '2025-11-09T00:00:00.000Z'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags:
+        - Lotes de Produtos
+      summary: Cria um novo lote de produto
+      description: |
+        Cria um novo lote de produto no sistema com os dados fornecidos.
+        
+        **Validações:**
+        - Nome é obrigatório (mínimo 3 caracteres)
+        - Descrição é obrigatória (mínimo 10 caracteres)
+        - Quantidade é obrigatória (deve ser ≥ 0)
+        - Valor é obrigatório (deve ser > 0)
+        - Lote ID é obrigatório (mínimo 3 caracteres)
+        - Validade é obrigatória (formato: YYYY-MM-DD)
+        - Ativo é opcional (default: true)
+      operationId: createLoteProduto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoteProdutoInput'
+            example:
+              nome: Produto A
+              descricao: Descrição detalhada do Produto A
+              quantidade: 100
+              valor: 25.50
+              lote_id: LOTE-001
+              validade: '2025-12-31'
+              ativo: true
+      responses:
+        '201':
+          description: Produto criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+              example:
+                _id: '507f1f77bcf86cd799439011'
+                nome: Produto A
+                descricao: Descrição detalhada do Produto A
+                quantidade: 100
+                valor: 25.50
+                lote_id: LOTE-001
+                validade: '2025-12-31'
+                ativo: true
+                createdAt: '2025-11-10T00:00:00.000Z'
+                updatedAt: '2025-11-10T00:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /lotes-produtos/{id}:
+    get:
+      tags:
+        - Lotes de Produtos
+      summary: Busca lote de produto por ID
+      description: Retorna os detalhes de um lote de produto específico pelo seu ID
+      operationId: getLoteProdutoById
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Produto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+              example:
+                _id: '507f1f77bcf86cd799439011'
+                nome: Produto A
+                descricao: Descrição do Produto A
+                quantidade: 100
+                valor: 25.50
+                lote_id: LOTE-001
+                validade: '2025-12-31'
+                ativo: true
+                createdAt: '2025-11-10T00:00:00.000Z'
+                updatedAt: '2025-11-10T00:00:00.000Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags:
+        - Lotes de Produtos
+      summary: Atualiza um lote de produto
+      description: |
+        Atualiza os dados de um lote de produto existente.
+        
+        **Notas:**
+        - Todos os campos são opcionais
+        - Apenas os campos fornecidos serão atualizados
+        - Para atualizar apenas o estoque, use o endpoint PATCH `/lotes-produtos/{id}/estoque`
+      operationId: updateLoteProduto
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoteProdutoUpdate'
+            example:
+              nome: Produto A Atualizado
+              quantidade: 150
+              valor: 30.00
+      responses:
+        '200':
+          description: Produto atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+              example:
+                _id: '507f1f77bcf86cd799439011'
+                nome: Produto A Atualizado
+                descricao: Descrição do Produto A
+                quantidade: 150
+                valor: 30.00
+                lote_id: LOTE-001
+                validade: '2025-12-31'
+                ativo: true
+                createdAt: '2025-11-10T00:00:00.000Z'
+                updatedAt: '2025-11-10T01:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags:
+        - Lotes de Produtos
+      summary: Deleta um lote de produto
+      description: |
+        Remove um lote de produto do sistema permanentemente.
+        
+        **Atenção:** Esta operação não pode ser desfeita.
+      operationId: deleteLoteProduto
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Produto deletado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Produto deletado com sucesso
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /lotes-produtos/{id}/estoque:
+    patch:
+      tags:
+        - Lotes de Produtos
+      summary: Atualiza apenas o estoque de um produto
+      description: |
+        Endpoint dedicado para atualização rápida de estoque.
+        
+        **Uso típico:**
+        - Entrada de mercadorias: adicione unidades ao estoque atual
+        - Saída de mercadorias: subtraia unidades do estoque atual
+        - Ajuste de inventário: defina novo valor de estoque
+        
+        **Validação:**
+        - Quantidade não pode ser negativa
+      operationId: updateEstoqueLoteProduto
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstoqueUpdate'
+            examples:
+              entrada:
+                summary: Entrada de mercadoria
+                value:
+                  quantidade: 200
+              ajuste:
+                summary: Ajuste de inventário
+                value:
+                  quantidade: 50
+      responses:
+        '200':
+          description: Estoque atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoteProduto'
+              example:
+                _id: '507f1f77bcf86cd799439011'
+                nome: Produto A
+                descricao: Descrição do Produto A
+                quantidade: 200
+                valor: 25.50
+                lote_id: LOTE-001
+                validade: '2025-12-31'
+                ativo: true
+                createdAt: '2025-11-10T00:00:00.000Z'
+                updatedAt: '2025-11-10T02:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    LoteProduto:
+      type: object
+      description: Representação completa de um lote de produto no sistema
+      properties:
+        _id:
+          type: string
+          description: ID único do produto (ObjectId do MongoDB)
+          example: '507f1f77bcf86cd799439011'
+        nome:
+          type: string
+          description: Nome do produto
+          minLength: 3
+          maxLength: 100
+          example: Produto A
+        descricao:
+          type: string
+          description: Descrição detalhada do produto
+          minLength: 10
+          maxLength: 500
+          example: Descrição detalhada do Produto A
+        quantidade:
+          type: integer
+          description: Quantidade em estoque
+          minimum: 0
+          example: 100
+        valor:
+          type: number
+          format: double
+          description: Valor unitário do produto
+          minimum: 0.01
+          example: 25.50
+        lote_id:
+          type: string
+          description: Identificador do lote
+          minLength: 3
+          maxLength: 50
+          example: LOTE-001
+        validade:
+          type: string
+          format: date
+          description: Data de validade do lote
+          example: '2025-12-31'
+        ativo:
+          type: boolean
+          description: Status do produto (ativo/inativo)
+          default: true
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Data e hora de criação do registro
+          readOnly: true
+          example: '2025-11-10T00:00:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Data e hora da última atualização
+          readOnly: true
+          example: '2025-11-10T00:00:00.000Z'
+      required:
+        - _id
+        - nome
+        - descricao
+        - quantidade
+        - valor
+        - lote_id
+        - validade
+        - ativo
+        - createdAt
+        - updatedAt
+
+    LoteProdutoInput:
+      type: object
+      description: Dados necessários para criar um novo lote de produto
+      properties:
+        nome:
+          type: string
+          description: Nome do produto
+          minLength: 3
+          maxLength: 100
+          example: Produto A
+        descricao:
+          type: string
+          description: Descrição detalhada do produto
+          minLength: 10
+          maxLength: 500
+          example: Descrição detalhada do Produto A
+        quantidade:
+          type: integer
+          description: Quantidade em estoque
+          minimum: 0
+          example: 100
+        valor:
+          type: number
+          format: double
+          description: Valor unitário do produto
+          minimum: 0.01
+          example: 25.50
+        lote_id:
+          type: string
+          description: Identificador do lote
+          minLength: 3
+          maxLength: 50
+          example: LOTE-001
+        validade:
+          type: string
+          format: date
+          description: Data de validade do lote (formato YYYY-MM-DD)
+          example: '2025-12-31'
+        ativo:
+          type: boolean
+          description: Status do produto (ativo/inativo)
+          default: true
+          example: true
+      required:
+        - nome
+        - descricao
+        - quantidade
+        - valor
+        - lote_id
+        - validade
+
+    LoteProdutoUpdate:
+      type: object
+      description: Dados que podem ser atualizados em um lote de produto existente (todos opcionais)
+      properties:
+        nome:
+          type: string
+          description: Nome do produto
+          minLength: 3
+          maxLength: 100
+          example: Produto A Atualizado
+        descricao:
+          type: string
+          description: Descrição detalhada do produto
+          minLength: 10
+          maxLength: 500
+          example: Nova descrição do Produto A
+        quantidade:
+          type: integer
+          description: Quantidade em estoque
+          minimum: 0
+          example: 150
+        valor:
+          type: number
+          format: double
+          description: Valor unitário do produto
+          minimum: 0.01
+          example: 30.00
+        lote_id:
+          type: string
+          description: Identificador do lote
+          minLength: 3
+          maxLength: 50
+          example: LOTE-001-B
+        validade:
+          type: string
+          format: date
+          description: Data de validade do lote
+          example: '2026-12-31'
+        ativo:
+          type: boolean
+          description: Status do produto (ativo/inativo)
+          example: false
+
+    EstoqueUpdate:
+      type: object
+      description: Dados para atualização específica de estoque
+      properties:
+        quantidade:
+          type: integer
+          description: Nova quantidade em estoque
+          minimum: 0
+          example: 200
+      required:
+        - quantidade
+
+    Error:
+      type: object
+      description: Estrutura padrão de resposta de erro
+      properties:
+        error:
+          type: string
+          description: Mensagem de erro descritiva
+          example: Erro ao processar requisição
+
+  parameters:
+    idParam:
+      name: id
+      in: path
+      description: ID único do lote de produto (ObjectId do MongoDB)
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9a-fA-F]{24}$'
+        example: '507f1f77bcf86cd799439011'
+
+  responses:
+    BadRequest:
+      description: Requisição inválida - dados fornecidos são inválidos ou incompletos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            campoObrigatorio:
+              value:
+                error: Campo 'nome' é obrigatório
+            quantidadeInvalida:
+              value:
+                error: Quantidade não pode ser negativa
+            valorInvalido:
+              value:
+                error: Valor deve ser maior que zero
+            validadeInvalida:
+              value:
+                error: Data de validade inválida
+
+    NotFound:
+      description: Produto não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Produto não encontrado
+
+    InternalError:
+      description: Erro interno do servidor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Erro interno do servidor

@@ -2,6 +2,16 @@
 
 Sistema completo de gerenciamento de usuários e lotes de produtos com arquitetura de microserviços orientada a eventos, implementando o padrão API Gateway (BFF), frontend React, e integração completa com Azure Cloud Services.
 
+## 👥 Autores
+
+Este projeto foi desenvolvido como trabalho acadêmico pelos seguintes alunos:
+
+- **Evelyn Costa**
+- **João Victor Morcelli**
+- **Natália Molini**
+- **Nicholas Tsuru**
+- **Vinícius Veiga**
+
 ## 📋 Índice
 
 - [Visão Geral da Arquitetura](#-visão-geral-da-arquitetura)
@@ -46,6 +56,132 @@ BFF (:3000) ─┬─→ micro-azure (:3001) → Azure SQL
 1. **Criação de Usuário**: Frontend → BFF → micro-azure → Azure SQL + **Service Bus** → function-usuarios-auditoria → MongoDB (auditoria)
 2. **Criação de Produto**: Frontend → BFF → micro-mongo → MongoDB + **Service Bus** → function-produtos-auditoria → Azure SQL (auditoria + alertas)
 3. **Consulta Agregada**: Frontend → BFF → Agrega dados de microserviços + Azure Functions → Resposta unificada
+
+## 🏛️ Princípios Arquiteturais
+
+### Clean Architecture
+
+O projeto segue os princípios de **Clean Architecture** (Arquitetura Limpa), garantindo separação clara de responsabilidades e independência de frameworks, banco de dados e UI. Cada componente do sistema está organizado em camadas bem definidas:
+
+#### Estrutura de Camadas nos Microserviços
+
+**1. Camada de Apresentação (Controllers)**
+- Recebe requisições HTTP
+- Valida entrada básica
+- Delega processamento para a camada de serviço
+- Retorna respostas formatadas
+- **Exemplo**: `controllers/userController.js`, `controllers/productController.js`
+
+**2. Camada de Negócio (Services)**
+- Contém lógica de negócio
+- Coordena operações entre diferentes componentes
+- Valida regras de negócio
+- Acessa camada de persistência
+- **Exemplo**: `services/userService.js`, `services/productService.js`
+
+**3. Camada de Persistência (DB/Models)**
+- Gerencia conexões com banco de dados
+- Define modelos de dados (Mongoose para MongoDB)
+- Executa queries e comandos SQL/NoSQL
+- **Exemplo**: `db/connection.js`, `models/LoteProduct.js`
+
+**4. Camada de Infraestrutura (Config/Middleware)**
+- Configurações da aplicação
+- Middleware de segurança (Helmet, CORS)
+- Tratamento centralizado de erros
+- Logging
+- **Exemplo**: `config/index.js`, `middleware/errorHandler.js`
+
+#### Estrutura nos Azure Functions
+
+As Azure Functions seguem o princípio de **Single Responsibility**, onde cada função tem uma única responsabilidade bem definida:
+
+- **ProcessUsuarioCriado**: Processa eventos de criação de usuários do Service Bus
+- **GetUsuariosAuditoria**: Endpoint HTTP para consultar logs de auditoria
+- **GetStatistics**: Endpoint HTTP para estatísticas agregadas
+- **TestDatabaseConnection**: Função de diagnóstico para validar conectividade
+
+Cada função importa configuração centralizada de `config/database.js`, mantendo a separação de responsabilidades.
+
+### Vertical Slice Architecture
+
+O sistema implementa **Vertical Slice Architecture** (Arquitetura de Fatia Vertical), onde cada feature possui seu próprio fluxo completo e independente, da interface até a persistência:
+
+#### Slice "Usuários"
+```
+Routes (userRoutes.js)
+   ↓
+Controllers (userController.js)
+   ↓
+Services (userService.js)
+   ↓
+Database (Azure SQL)
+```
+
+**Benefícios**:
+- Mudanças em usuários não afetam produtos
+- Cada slice pode evoluir independentemente
+- Facilita manutenção e testes
+- Reduz acoplamento entre domínios
+
+#### Slice "Produtos"
+```
+Routes (productRoutes.js)
+   ↓
+Controllers (productController.js)
+   ↓
+Services (productService.js)
+   ↓
+Models (LoteProduct.js)
+   ↓
+Database (MongoDB)
+```
+
+#### Slice "Auditoria de Usuários" (Azure Function)
+```
+Service Bus Trigger (ProcessUsuarioCriado)
+   ↓
+HTTP Endpoints (GetUsuariosAuditoria, GetStatistics)
+   ↓
+Config (database.js)
+   ↓
+Database (MongoDB)
+```
+
+**Características**:
+- **Não há dependências cruzadas**: userController não importa productService
+- **Isolamento completo**: cada feature tem seus próprios arquivos
+- **Event-Driven**: comunicação entre slices via Service Bus (eventos)
+- **Autonomia**: cada slice pode usar tecnologia diferente (SQL vs NoSQL)
+
+### Testes de Arquitetura
+
+O projeto inclui **testes unitários de arquitetura** que validam automaticamente:
+
+1. ✅ **Separação de camadas**: Verifica existência de diretórios (controllers, services, routes)
+2. ✅ **Nomenclatura padrão**: Controllers terminam em `Controller.js`, Services em `Service.js`
+3. ✅ **Dependências corretas**: Controllers importam Services, não acessam banco diretamente
+4. ✅ **Vertical Slices isolados**: Features não têm dependências cruzadas indevidas
+5. ✅ **Health checks**: Cada serviço tem endpoint de saúde
+6. ✅ **Configuração centralizada**: Config em diretório dedicado
+
+Para executar os testes de arquitetura:
+```bash
+# micro-bff
+cd micro-bff && npm test
+
+# micro-azure
+cd micro-azure && npm test
+
+# micro-mongo
+cd micro-mongo && npm test
+
+# Azure Functions
+cd function-usuarios-auditoria && npm test
+cd function-produtos-auditoria && npm test
+```
+
+Para mais detalhes técnicos sobre a arquitetura, consulte [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## 📦 Componentes do Sistema
 
@@ -592,190 +728,6 @@ curl http://localhost:7071/api/statistics
 curl http://localhost:7072/api/produtos-auditoria
 ```
 
-### Testar Fluxo Completo
-
-#### 1. Criar Usuário
-```bash
-curl -X POST http://localhost:3000/api/v1/usuarios \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nome": "João Silva",
-    "email": "joao@exemplo.com",
-    "senha": "senha123"
-  }'
-```
-
-#### 2. Verificar Evento Processado (aguardar alguns segundos)
-```bash
-curl http://localhost:7071/api/usuarios-auditoria
-```
-
-#### 3. Criar Produto
-```bash
-curl -X POST http://localhost:3000/api/v1/lotes-produtos \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nome": "Arroz Integral 1kg",
-    "categoria": "Alimentos",
-    "estoque": 45,
-    "valor": 15.99,
-    "validade": "2025-12-31"
-  }'
-```
-
-#### 4. Verificar Alertas (estoque baixo)
-```bash
-curl http://localhost:7072/api/relatorios/estoque-baixo
-```
-
-#### 5. Consultar Dashboard Agregado
-```bash
-curl http://localhost:3000/api/v1/agregacao/dashboard
-```
-
-## 🐛 Troubleshooting
-
-### Problema: Containers não estão lendo variáveis de ambiente / Erro de conexão com banco de dados
-**Causa**: Arquivos `.env` são intencionalmente **excluídos** das imagens Docker (via `.dockerignore`) por segurança. Variáveis de ambiente devem ser passadas em **runtime**.
-
-**Solução - Desenvolvimento Local**:
-
-**Opção 1: Usar docker-compose (Recomendado)**
-```bash
-cd micro-azure  # ou micro-mongo, micro-bff
-cp .env.example .env
-# Editar .env com suas configurações
-docker-compose up
-```
-
-O `docker-compose.yml` já está configurado com `env_file: [.env]` para carregar automaticamente as variáveis.
-
-**Opção 2: Usar --env-file com docker run**
-```bash
-docker run --env-file .env -p 3001:3001 micro-azure
-```
-
-**Opção 3: Passar variáveis individualmente**
-```bash
-docker run \
-  -e AZURE_SQL_SERVER=myserver.database.windows.net \
-  -e AZURE_SQL_DATABASE=mydb \
-  -e AZURE_SQL_USER=admin \
-  -e AZURE_SQL_PASSWORD=mypassword \
-  -p 3001:3001 micro-azure
-```
-
-**Solução - Azure (Produção)**:
-No Azure App Service, as variáveis de ambiente são configuradas via:
-- Portal: App Service → Configuration → Application Settings
-- CLI: `az webapp config appsettings set --settings KEY=VALUE`
-
-**Não é necessário (nem recomendado) incluir arquivos `.env` em produção.**
-
-**Verificar se as variáveis estão carregadas:**
-```bash
-# Entrar no container em execução
-docker exec -it <container-name> sh
-# Ver variáveis de ambiente
-env | grep AZURE
-```
-
-### Problema: Frontend deployment falha com erro "EBADENGINE Unsupported engine"
-**Causa**: Azure Static Web Apps está usando Node.js v18, mas o projeto requer v20+
-
-**Solução**: 
-1. Verificar que o arquivo `.nvmrc` existe em `mfe-admin/` com conteúdo `20`
-2. Verificar que `package.json` tem o campo `engines` especificando Node >=20.0.0
-3. Se usando GitHub Actions, adicionar ao workflow:
-```yaml
-env:
-  NODE_VERSION: '20'
-```
-4. Limpar cache do Azure e refazer deploy
-```bash
-# Deletar e recriar Static Web App
-az staticwebapp delete --name levaja-frontend --resource-group levaja-rg
-# Recriar com configuração correta
-```
-
-### Problema: Containers não iniciam no Azure
-**Solução**: Verificar logs do container
-```bash
-az webapp log tail --name levaja-micro-azure --resource-group levaja-rg
-```
-
-### Problema: Service Bus não recebe eventos
-**Solução**: Verificar connection string e permissões
-```bash
-# Testar envio direto
-curl -X POST http://localhost:3000/api/v1/azure/send-message \
-  -H "Content-Type: application/json" \
-  -d '{"message": "teste"}'
-```
-
-### Problema: Azure Functions não disparam com Service Bus
-**Solução**: 
-1. Verificar se a fila existe
-2. Verificar connection string nas configurações
-3. Verificar logs da Function
-```bash
-func azure functionapp logstream levaja-func-usuarios
-```
-
-### Problema: CORS errors no frontend
-**Solução**: Adicionar origem do frontend no .env do BFF
-```env
-CORS_ORIGIN=https://seu-frontend.azurewebsites.net,http://localhost:5173
-```
-
-### Problema: Connection timeout para SQL Server
-**Solução**: Verificar regras de firewall
-```bash
-az sql server firewall-rule create \
-  --resource-group levaja-rg \
-  --server levaja-sql-server \
-  --name AllowMyIP \
-  --start-ip-address SEU_IP \
-  --end-ip-address SEU_IP
-```
-
-## 📊 Monitoramento
-
-### Application Insights
-```bash
-# Habilitar Application Insights para todos os serviços
-az monitor app-insights component create \
-  --app levaja-insights \
-  --location brazilsouth \
-  --resource-group levaja-rg
-
-# Configurar nos serviços
-az webapp config appsettings set \
-  --name levaja-bff \
-  --resource-group levaja-rg \
-  --settings APPINSIGHTS_INSTRUMENTATIONKEY="sua-key"
-```
-
-## 💰 Estimativa de Custos (Azure)
-
-### Tier Básico (Desenvolvimento/Teste)
-- **App Service Plan (B1)**: ~R$ 60/mês (3 containers)
-- **Azure SQL (S0)**: ~R$ 30/mês × 2 = R$ 60/mês
-- **Cosmos DB (400 RU/s)**: ~R$ 60/mês
-- **Service Bus (Basic)**: ~R$ 2/mês
-- **Functions (Consumption)**: ~R$ 0 (free tier)
-- **Container Registry**: ~R$ 20/mês
-- **Total**: ~R$ 200-250/mês
-
-### Tier Produção (Escalável)
-- **App Service Plan (P1V2)**: ~R$ 280/mês
-- **Azure SQL (S2)**: ~R$ 180/mês × 2 = R$ 360/mês
-- **Cosmos DB (1000 RU/s)**: ~R$ 150/mês
-- **Service Bus (Standard)**: ~R$ 40/mês
-- **Functions (Premium)**: ~R$ 350/mês
-- **Application Insights**: ~R$ 50/mês
-- **Total**: ~R$ 1200-1500/mês
-
 ## 📝 Variáveis de Ambiente - Resumo
 
 ### micro-bff
@@ -840,21 +792,31 @@ MONGODB_URI=mongodb://levaja-cosmos:...@levaja-cosmos.mongo.cosmos.azure.com:102
 
 ## 📚 Documentação Adicional
 
+### Arquitetura e Deployment
 - **ARCHITECTURE.md**: Arquitetura completa do sistema
+- **SECURITY_SUMMARY.md**: Análise de segurança e vulnerabilidades
 - **micro-bff/AZURE_DEPLOY.md**: Guia detalhado de deploy do BFF
 - **micro-bff/AZURE_INTEGRATION.md**: Integração com Azure Services
 - **micro-bff/SECURITY.md**: Considerações de segurança
+
+### Microserviços
+- **micro-azure/TROUBLESHOOTING.md**: 🆕 Guia de troubleshooting para desconexões Azure SQL
 - **function-usuarios-auditoria/README.md**: Documentação da Function de usuários
 - **function-produtos-auditoria/README.md**: Documentação da Function de produtos
+
+### Frontend
+- **mfe-admin/DEPLOY.md**: 🆕 Guia completo de deploy do frontend
+- **mfe-admin/staticwebapp.config.json**: 🆕 Configuração para Azure Static Web Apps
+
+### Testes
+- **micro-bff/tests/architecture.test.js**: Testes de arquitetura do BFF
+- **micro-azure/tests/architecture.test.js**: Testes de arquitetura do micro-azure
+- **micro-mongo/tests/architecture.test.js**: Testes de arquitetura do micro-mongo
+- **function-usuarios-auditoria/tests/architecture.test.js**: Testes de arquitetura da function
+- **function-produtos-auditoria/tests/architecture.test.js**: Testes de arquitetura da function
 
 ## 🤝 Suporte
 
 Para problemas ou dúvidas, consulte a documentação específica de cada componente ou abra uma issue no repositório.
-
-## 📄 Licença
-
-[Incluir licença do projeto]
-
----
 
 **Desenvolvido com ❤️ para o projeto LevaJá**

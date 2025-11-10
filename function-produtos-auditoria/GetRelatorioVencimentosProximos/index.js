@@ -1,4 +1,5 @@
 const { getPool } = require('../config/database');
+const { connectMongoDB } = require('../config/mongoDatabase');
 
 module.exports = async function (context, req) {
     try {
@@ -67,6 +68,83 @@ module.exports = async function (context, req) {
                 ORDER BY dias_vencido DESC
             `);
 
+        // ===== VERIFICAÇÃO DE DADOS (MongoDB) =====
+        const inconsistencias = [];
+        let produtosVencendoMongo = [];
+        let produtosVencidosMongo = [];
+
+        try {
+            const db = await connectMongoDB();
+            const collection = db.collection('lotes_produtos');
+
+            const hoje = new Date();
+            const dataLimite = new Date();
+            dataLimite.setDate(dataLimite.getDate() + diasProximos);
+
+            // Produtos vencendo no MongoDB (dados reais)
+            produtosVencendoMongo = await collection
+                .find({
+                    validade: { 
+                        $exists: true,
+                        $gte: hoje,
+                        $lte: dataLimite
+                    }
+                })
+                .sort({ validade: 1 })
+                .limit(50)
+                .toArray();
+
+            if (produtosVencendoMongo.length > 0) {
+                inconsistencias.push({
+                    tipo: 'VENCIMENTO_PROXIMO_MONGODB',
+                    total: produtosVencendoMongo.length,
+                    mensagem: `${produtosVencendoMongo.length} produtos vencendo em ≤ ${diasProximos} dias no MongoDB`,
+                    severidade: 'ALTA'
+                });
+            }
+
+            // Produtos já vencidos no MongoDB
+            produtosVencidosMongo = await collection
+                .find({
+                    validade: { 
+                        $exists: true,
+                        $lt: hoje
+                    }
+                })
+                .sort({ validade: -1 })
+                .limit(50)
+                .toArray();
+
+            if (produtosVencidosMongo.length > 0) {
+                inconsistencias.push({
+                    tipo: 'PRODUTOS_VENCIDOS_MONGODB',
+                    total: produtosVencidosMongo.length,
+                    mensagem: `${produtosVencidosMongo.length} produtos já vencidos no MongoDB`,
+                    severidade: 'CRÍTICA'
+                });
+            }
+
+            // Verificar produtos sem validade
+            const semValidade = await collection.countDocuments({
+                $or: [
+                    { validade: { $exists: false } },
+                    { validade: null }
+                ]
+            });
+
+            if (semValidade > 0) {
+                inconsistencias.push({
+                    tipo: 'SEM_VALIDADE',
+                    total: semValidade,
+                    mensagem: `${semValidade} produtos sem data de validade`,
+                    severidade: 'BAIXA'
+                });
+            }
+
+        } catch (mongoError) {
+            context.log('Warning: Could not verify MongoDB data:', mongoError.message);
+        }
+
         context.res = {
             status: 200,
             body: {
@@ -77,7 +155,25 @@ module.exports = async function (context, req) {
                 totalAlertas: alertas.recordset.length,
                 produtosProximos: produtos.recordset,
                 produtosVencidos: vencidos.recordset,
-                alertas: alertas.recordset
+                alertas: alertas.recordset,
+                verification: {
+                    produtosVencendoMongoDB: produtosVencendoMongo.length,
+                    produtosVencidosMongoDB: produtosVencidosMongo.length,
+                    totalInconsistencias: inconsistencias.length,
+                    inconsistencias: inconsistencias,
+                    exemplosVencendo: produtosVencendoMongo.slice(0, 5).map(p => ({
+                        id: p._id,
+                        nome: p.nome,
+                        validade: p.validade,
+                        estoque: p.estoque
+                    })),
+                    exemplosVencidos: produtosVencidosMongo.slice(0, 5).map(p => ({
+                        id: p._id,
+                        nome: p.nome,
+                        validade: p.validade,
+                        estoque: p.estoque
+                    }))
+                }
             }
         };
     } catch (error) {

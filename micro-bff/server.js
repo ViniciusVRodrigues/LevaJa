@@ -6,6 +6,7 @@ const logger = require('./middleware/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const routes = require('./routes');
 const serviceBusService = require('./services/serviceBusService');
+const { specs, swaggerUi } = require('./swagger');
 
 /**
  * Servidor Express.js - BFF (Backend for Frontend) API Gateway
@@ -15,8 +16,10 @@ const serviceBusService = require('./services/serviceBusService');
 const app = express();
 
 // ========== Middlewares de Segurança ==========
-// Helmet - proteção contra vulnerabilidades comuns
-app.use(helmet());
+// Helmet - proteção contra vulnerabilidades comuns (desabilita CSP para Swagger UI)
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
 
 // CORS - configuração de origens permitidas
 app.use(cors(config.cors));
@@ -32,6 +35,17 @@ app.use(express.urlencoded({ extended: true }));
 // Morgan - logging de requisições HTTP
 app.use(logger);
 
+// ========== Swagger Documentation ==========
+// Swagger UI disponível em /api-docs
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  customCssUrl: 'https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-material.css',
+  customSiteTitle: 'BFF API Gateway - LevaJá',
+  customfavIcon: 'https://swagger.io/favicon.ico',
+  swaggerOptions: {
+    persistAuthorization: true,
+  },
+}));
+
 // ========== Rotas ==========
 // Rota raiz
 app.get('/', (req, res) => {
@@ -42,9 +56,14 @@ app.get('/', (req, res) => {
       health: '/api/v1/health',
       usuarios: '/api/v1/usuarios',
       lotesProdutos: '/api/v1/lotes-produtos',
+      agregacao: '/api/v1/agregacao',
+      statistics: '/api/v1/statistics',
       azure: '/api/v1/azure'
     },
-    documentation: '/swagger.yaml'
+    documentation: {
+      swagger: '/api-docs',
+      yaml: '/swagger.yaml'
+    }
   });
 });
 
@@ -70,6 +89,7 @@ const server = app.listen(PORT, async () => {
 ║  Servidor rodando em: http://localhost:${PORT}            ║
 ║  Ambiente: ${config.nodeEnv.padEnd(42)}  ║
 ║  Health Check: http://localhost:${PORT}/api/v1/health     ║
+║  Swagger Docs: http://localhost:${PORT}/api-docs          ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
