@@ -1,0 +1,426 @@
+openapi: 3.0.3
+info:
+  title: Microserviço de Usuários - Azure SQL
+  description: |
+    API REST para gerenciamento de usuários usando Azure SQL Database.
+    
+    Este microserviço faz parte da arquitetura de microserviços do projeto LevaJa e é responsável por:
+    - CRUD completo de usuários
+    - Armazenamento em Azure SQL Database
+    - Validação de dados de entrada
+    - Health check para monitoramento
+    
+    ## Arquitetura
+    - **Clean Architecture**: Separação clara entre Controllers, Services e Persistência
+    - **Vertical Slice**: Feature completa de usuários isolada
+    - **Lazy Connection**: Conexão ao banco sob demanda para resiliência
+  version: 1.0.0
+  contact:
+    name: Vinícius Viana Rodrigues
+    email: viniciusvrodrigues@example.com
+
+servers:
+  - url: http://localhost:3002
+    description: Servidor de desenvolvimento local
+  - url: https://micro-azure-usuarios.azurewebsites.net
+    description: Servidor de produção Azure
+
+tags:
+  - name: Usuários
+    description: Operações CRUD de usuários
+  - name: Health
+    description: Health check e informações do serviço
+
+paths:
+  /:
+    get:
+      tags:
+        - Health
+      summary: Informações do serviço
+      description: Retorna informações básicas sobre o microserviço e seus endpoints disponíveis
+      responses:
+        '200':
+          description: Informações do serviço
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Microserviço de Usuários - Azure SQL
+                  endpoints:
+                    type: object
+                    properties:
+                      health:
+                        type: string
+                        example: /health
+                      usuarios:
+                        type: string
+                        example: /usuarios
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Verifica o status do serviço
+      responses:
+        '200':
+          description: Serviço operacional
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: micro-azure (usuarios)
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2025-11-10T00:00:00.000Z'
+
+  /usuarios:
+    get:
+      tags:
+        - Usuários
+      summary: Lista todos os usuários
+      description: |
+        Retorna uma lista paginada de usuários cadastrados no sistema.
+        
+        **Paginação:**
+        - Use `limit` para definir quantos registros retornar por página
+        - Use `offset` para pular registros (útil para páginas subsequentes)
+        - Exemplo: `?limit=10&offset=0` retorna os primeiros 10 usuários
+      operationId: listUsuarios
+      parameters:
+        - name: limit
+          in: query
+          description: Número máximo de registros a retornar
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+            example: 10
+        - name: offset
+          in: query
+          description: Número de registros a pular (para paginação)
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+      responses:
+        '200':
+          description: Lista de usuários retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+              example:
+                - id: 1
+                  nome: João Silva
+                  email: joao@example.com
+                  data_criacao: '2025-11-10T00:00:00.000Z'
+                - id: 2
+                  nome: Maria Santos
+                  email: maria@example.com
+                  data_criacao: '2025-11-09T00:00:00.000Z'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags:
+        - Usuários
+      summary: Cria um novo usuário
+      description: |
+        Cria um novo usuário no sistema com os dados fornecidos.
+        
+        **Validações:**
+        - Nome é obrigatório (mínimo 3 caracteres)
+        - Email é obrigatório e deve ser válido
+        - Senha é obrigatória (mínimo 6 caracteres)
+        - Email deve ser único no sistema
+      operationId: createUsuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioInput'
+            example:
+              nome: João Silva
+              email: joao@example.com
+              senha: senha123
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+              example:
+                id: 1
+                nome: João Silva
+                email: joao@example.com
+                data_criacao: '2025-11-10T00:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /usuarios/{id}:
+    get:
+      tags:
+        - Usuários
+      summary: Busca usuário por ID
+      description: Retorna os detalhes de um usuário específico pelo seu ID
+      operationId: getUsuarioById
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Usuário encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+              example:
+                id: 1
+                nome: João Silva
+                email: joao@example.com
+                data_criacao: '2025-11-10T00:00:00.000Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags:
+        - Usuários
+      summary: Atualiza um usuário
+      description: |
+        Atualiza os dados de um usuário existente.
+        
+        **Notas:**
+        - Todos os campos são opcionais
+        - Apenas os campos fornecidos serão atualizados
+        - Email deve ser único (se fornecido)
+      operationId: updateUsuario
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioUpdate'
+            example:
+              nome: João Silva Atualizado
+              email: joao.novo@example.com
+      responses:
+        '200':
+          description: Usuário atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+              example:
+                id: 1
+                nome: João Silva Atualizado
+                email: joao.novo@example.com
+                data_criacao: '2025-11-10T00:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags:
+        - Usuários
+      summary: Deleta um usuário
+      description: |
+        Remove um usuário do sistema permanentemente.
+        
+        **Atenção:** Esta operação não pode ser desfeita.
+      operationId: deleteUsuario
+      parameters:
+        - $ref: '#/components/parameters/idParam'
+      responses:
+        '200':
+          description: Usuário deletado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Usuário deletado com sucesso
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    Usuario:
+      type: object
+      description: Representação completa de um usuário no sistema
+      properties:
+        id:
+          type: integer
+          description: ID único do usuário (gerado automaticamente)
+          example: 1
+        nome:
+          type: string
+          description: Nome completo do usuário
+          minLength: 3
+          maxLength: 100
+          example: João Silva
+        email:
+          type: string
+          format: email
+          description: Endereço de email do usuário (deve ser único)
+          minLength: 5
+          maxLength: 100
+          example: joao@example.com
+        senha:
+          type: string
+          format: password
+          description: Senha do usuário (criptografada no banco)
+          writeOnly: true
+          minLength: 6
+          maxLength: 255
+        data_criacao:
+          type: string
+          format: date-time
+          description: Data e hora de criação do usuário
+          readOnly: true
+          example: '2025-11-10T00:00:00.000Z'
+      required:
+        - id
+        - nome
+        - email
+        - data_criacao
+
+    UsuarioInput:
+      type: object
+      description: Dados necessários para criar um novo usuário
+      properties:
+        nome:
+          type: string
+          description: Nome completo do usuário
+          minLength: 3
+          maxLength: 100
+          example: João Silva
+        email:
+          type: string
+          format: email
+          description: Endereço de email do usuário (deve ser único)
+          minLength: 5
+          maxLength: 100
+          example: joao@example.com
+        senha:
+          type: string
+          format: password
+          description: Senha do usuário (mínimo 6 caracteres)
+          minLength: 6
+          maxLength: 255
+          example: senha123
+      required:
+        - nome
+        - email
+        - senha
+
+    UsuarioUpdate:
+      type: object
+      description: Dados que podem ser atualizados em um usuário existente (todos opcionais)
+      properties:
+        nome:
+          type: string
+          description: Nome completo do usuário
+          minLength: 3
+          maxLength: 100
+          example: João Silva Atualizado
+        email:
+          type: string
+          format: email
+          description: Endereço de email do usuário (deve ser único)
+          minLength: 5
+          maxLength: 100
+          example: joao.novo@example.com
+        senha:
+          type: string
+          format: password
+          description: Nova senha do usuário
+          minLength: 6
+          maxLength: 255
+          example: novaSenha123
+
+    Error:
+      type: object
+      description: Estrutura padrão de resposta de erro
+      properties:
+        error:
+          type: string
+          description: Mensagem de erro descritiva
+          example: Erro ao processar requisição
+
+  parameters:
+    idParam:
+      name: id
+      in: path
+      description: ID único do usuário
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        example: 1
+
+  responses:
+    BadRequest:
+      description: Requisição inválida - dados fornecidos são inválidos ou incompletos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            campoObrigatorio:
+              value:
+                error: Campo 'nome' é obrigatório
+            emailInvalido:
+              value:
+                error: Email inválido
+            emailDuplicado:
+              value:
+                error: Email já cadastrado
+
+    NotFound:
+      description: Usuário não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Usuário não encontrado
+
+    InternalError:
+      description: Erro interno do servidor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Erro interno do servidor
