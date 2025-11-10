@@ -5,7 +5,6 @@ const morgan = require('morgan');
 const config = require('./config');
 const { connect, close } = require('./db/connection');
 const productRoutes = require('./routes/productRoutes');
-const { specs, swaggerUi } = require('./swagger');
 
 /**
  * Microserviço de Lotes de Produtos - MongoDB
@@ -14,39 +13,13 @@ const { specs, swaggerUi } = require('./swagger');
 const app = express();
 
 // Middlewares
-app.use(helmet({
-  contentSecurityPolicy: false, // Desabilita CSP para Swagger UI funcionar
-}));
+app.use(helmet());
 app.use(cors(config.cors));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-/**
- * @swagger
- * /health:
- *   get:
- *     summary: Health check do serviço
- *     description: Verifica se o serviço está operacional
- *     tags: [Health]
- *     responses:
- *       200:
- *         description: Serviço operacional
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: ok
- *                 service:
- *                   type: string
- *                   example: micro-mongo (lotes-produtos)
- *                 timestamp:
- *                   type: string
- *                   format: date-time
- */
+// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -55,40 +28,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
-  customSiteTitle: 'API Docs - Microserviço Produtos',
-  customCss: '.swagger-ui .topbar { display: none }'
-}));
-
 // Rotas
 app.use('/lotes-produtos', productRoutes);
 
-/**
- * @swagger
- * /:
- *   get:
- *     summary: Informações da API
- *     description: Retorna informações básicas e endpoints disponíveis
- *     tags: [Health]
- *     responses:
- *       200:
- *         description: Informações da API
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 endpoints:
- *                   type: object
- */
+// Rota raiz
 app.get('/', (req, res) => {
   res.json({
     message: 'Microserviço de Lotes de Produtos - MongoDB',
     endpoints: {
-      swagger: '/api-docs',
       health: '/health',
       lotesProdutos: '/lotes-produtos'
     }
