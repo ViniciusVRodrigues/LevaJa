@@ -19,8 +19,8 @@ info:
     - **Service Bus**: Publica eventos para processamento assíncrono
     - **Azure Functions**: Integração via HTTP triggers
   contact:
-    name: Vinícius Viana Rodrigues
-    email: viniciusvrodrigues@github.com
+    name: Vinícius Veiga Rodrigues
+    email: vinicius710@hotmail.com
   license:
     name: ISC
     url: https://opensource.org/licenses/ISC
