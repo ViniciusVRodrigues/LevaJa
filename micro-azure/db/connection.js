@@ -20,7 +20,11 @@ function sleep(ms) {
  * Verifica se está em processo de reconexão
  */
 function isReconnecting() {
-  return isConnecting || (reconnectionStartTime !== null);
+  const reconnecting = isConnecting || (reconnectionStartTime !== null);
+  if (reconnecting && Date.now() % 5000 < 100) { // Log a cada ~5s para não poluir
+    console.log(`🔄 Sistema em reconexão: isConnecting=${isConnecting}, reconnectionStartTime=${reconnectionStartTime ? 'set' : 'null'}`);
+  }
+  return reconnecting;
 }
 
 /**
@@ -58,7 +62,10 @@ async function connect(retryCount = 0) {
     
     // Mark reconnection start if this is a reconnection (pool was null/disconnected)
     if (!pool || !pool.connected) {
-      reconnectionStartTime = Date.now();
+      if (reconnectionStartTime === null) {
+        reconnectionStartTime = Date.now();
+        console.log('🔄 Iniciando processo de reconexão...');
+      }
     }
 
     // Fecha pool anterior se existir
@@ -94,9 +101,11 @@ async function connect(retryCount = 0) {
       tableInitialized = true;
     }
 
+    // Só limpa os flags DEPOIS de tudo estar pronto
     isConnecting = false;
     connectionPromise = null;
     reconnectionStartTime = null; // Clear reconnection state on success
+    console.log('✅ Reconexão finalizada com sucesso. Sistema operacional.');
     return pool;
   } catch (error) {
     isConnecting = false;
@@ -161,13 +170,19 @@ async function getPool() {
       } catch (testError) {
         console.warn('⚠️ Teste de conexão falhou:', testError.message);
         pool = null; // Invalida o pool
-        reconnectionStartTime = Date.now(); // Mark as needing reconnection
+        if (reconnectionStartTime === null) {
+          reconnectionStartTime = Date.now(); // Mark as needing reconnection
+          console.log('🔄 Conexão perdida, marcando para reconexão...');
+        }
       }
     }
 
     // Se pool não existe ou está desconectado, cria novo
     if (!pool || !pool.connected) {
       console.log('🔄 Pool não disponível. Conectando...');
+      if (reconnectionStartTime === null) {
+        reconnectionStartTime = Date.now();
+      }
       return await connect();
     }
 
