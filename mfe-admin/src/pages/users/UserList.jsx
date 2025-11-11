@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
 import Loading from '../../components/Loading';
+import ReconnectionAlert from '../../components/ReconnectionAlert';
 import './UserList.css';
 
 function UserList() {
@@ -9,6 +10,7 @@ function UserList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ limit: 10, offset: 0, total: 0 });
+  const [reconnecting, setReconnecting] = useState({ show: false, retryIn: 15, message: '' });
 
   useEffect(() => {
     loadUsers();
@@ -18,6 +20,7 @@ function UserList() {
     try {
       setLoading(true);
       setError(null);
+      setReconnecting({ show: false, retryIn: 15, message: '' });
       const data = await userService.getAll({
         limit: pagination.limit,
         offset: pagination.offset
@@ -25,7 +28,17 @@ function UserList() {
       setUsers(data.data || []);
       setPagination(prev => ({ ...prev, total: data.total || 0 }));
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao carregar usuários');
+      // Check if it's a reconnection error
+      if (err.isReconnecting) {
+        setReconnecting({
+          show: true,
+          retryIn: err.retryIn || 15,
+          message: err.message
+        });
+        setError(null);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Erro ao carregar usuários');
+      }
     } finally {
       setLoading(false);
     }
@@ -40,8 +53,21 @@ function UserList() {
       await userService.delete(id);
       loadUsers();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erro ao deletar usuário');
+      // Check if it's a reconnection error
+      if (err.isReconnecting) {
+        setReconnecting({
+          show: true,
+          retryIn: err.retryIn || 15,
+          message: err.message
+        });
+      } else {
+        alert(err.response?.data?.message || err.message || 'Erro ao deletar usuário');
+      }
     }
+  };
+
+  const handleRetry = () => {
+    loadUsers();
   };
 
   const nextPage = () => {
@@ -60,6 +86,13 @@ function UserList() {
 
   return (
     <div className="page-container">
+      <ReconnectionAlert
+        show={reconnecting.show}
+        retryIn={reconnecting.retryIn}
+        message={reconnecting.message}
+        onRetry={handleRetry}
+      />
+      
       <div className="page-header">
         <h1>Gerenciar Usuários</h1>
         <Link to="/usuarios/novo" className="btn btn-primary">

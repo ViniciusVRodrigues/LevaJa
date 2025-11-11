@@ -45,7 +45,17 @@ app.get('/', (req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(err.status || 500).json({
+  
+  // Handle reconnection errors specifically
+  if (err.isReconnectionError || err.code === 'AZURE_SQL_RECONNECTING') {
+    return res.status(503).json({
+      error: err.code || 'AZURE_SQL_RECONNECTING',
+      retryIn: err.retryIn || 15,
+      message: err.message || 'O banco de dados está reconectando, tente novamente em alguns instantes.'
+    });
+  }
+  
+  res.status(err.status || err.statusCode || 500).json({
     error: err.message || 'Erro interno do servidor'
   });
 });

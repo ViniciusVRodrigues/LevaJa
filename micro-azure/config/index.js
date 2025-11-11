@@ -4,6 +4,10 @@ const config = {
   port: process.env.PORT || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
   
+  // Configurações de timeout e reconexão
+  requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 15000, // 15 segundos padrão
+  azureSqlReconnectRetrySeconds: parseInt(process.env.AZURE_SQL_RECONNECT_RETRY_SECONDS) || 15, // 15 segundos padrão
+  
   database: {
     server: process.env.AZURE_SQL_SERVER,
     database: process.env.AZURE_SQL_DATABASE,

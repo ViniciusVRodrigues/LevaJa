@@ -7,12 +7,28 @@ let connectionPromise = null;
 let lastConnectionAttempt = 0;
 const MIN_RECONNECT_INTERVAL = 5000; // 5 segundos entre tentativas
 let tableInitialized = false;
+let reconnectionStartTime = null; // Track when reconnection started
 
 /**
  * Aguarda com timeout
  */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Verifica se está em processo de reconexão
+ */
+function isReconnecting() {
+  return isConnecting || (reconnectionStartTime !== null);
+}
+
+/**
+ * Obtém tempo decorrido desde início da reconexão (em segundos)
+ */
+function getReconnectionElapsedSeconds() {
+  if (reconnectionStartTime === null) return 0;
+  return Math.floor((Date.now() - reconnectionStartTime) / 1000);
 }
 
 /**
@@ -39,6 +55,11 @@ async function connect(retryCount = 0) {
 
     isConnecting = true;
     lastConnectionAttempt = Date.now();
+    
+    // Mark reconnection start if this is a reconnection (pool was null/disconnected)
+    if (!pool || !pool.connected) {
+      reconnectionStartTime = Date.now();
+    }
 
     // Fecha pool anterior se existir
     if (pool) {
@@ -62,6 +83,7 @@ async function connect(retryCount = 0) {
       console.error('❌ Erro na conexão do pool:', err.message);
       pool = null;
       tableInitialized = false;
+      reconnectionStartTime = Date.now(); // Mark as needing reconnection
     });
 
     console.log('✅ Conectado ao Azure SQL Server');
@@ -74,6 +96,7 @@ async function connect(retryCount = 0) {
 
     isConnecting = false;
     connectionPromise = null;
+    reconnectionStartTime = null; // Clear reconnection state on success
     return pool;
   } catch (error) {
     isConnecting = false;
@@ -91,6 +114,7 @@ async function connect(retryCount = 0) {
     }
     
     console.error('❌ Falha após todas as tentativas de conexão');
+    // Keep reconnectionStartTime set so we can report it
     throw error;
   }
 }
@@ -137,6 +161,7 @@ async function getPool() {
       } catch (testError) {
         console.warn('⚠️ Teste de conexão falhou:', testError.message);
         pool = null; // Invalida o pool
+        reconnectionStartTime = Date.now(); // Mark as needing reconnection
       }
     }
 
@@ -162,6 +187,7 @@ async function close() {
       await pool.close();
       pool = null;
       tableInitialized = false;
+      reconnectionStartTime = null;
       console.log('🔌 Conexão com Azure SQL fechada');
     } catch (err) {
       console.error('❌ Erro ao fechar conexão:', err.message);
@@ -173,5 +199,7 @@ module.exports = {
   connect,
   getPool,
   close,
-  sql
+  sql,
+  isReconnecting,
+  getReconnectionElapsedSeconds
 };
