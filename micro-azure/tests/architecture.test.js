@@ -133,4 +133,31 @@ describe('Integração e Saúde do Sistema', () => {
     
     expect(hasConnection).toBe(true);
   });
+
+  test('Deve ter middleware de reconexão do Azure SQL', () => {
+    const middlewareDir = path.join(__dirname, '..', 'middleware');
+    
+    expect(fs.existsSync(middlewareDir)).toBe(true);
+    
+    const files = fs.readdirSync(middlewareDir);
+    const hasReconnectionHandler = files.some(f => f.includes('reconnection'));
+    
+    expect(hasReconnectionHandler).toBe(true);
+    
+    // Verifica se o middleware exporta as funções necessárias
+    const reconnectionHandlerFile = path.join(middlewareDir, 'reconnectionHandler.js');
+    const content = fs.readFileSync(reconnectionHandlerFile, 'utf-8');
+    
+    expect(content).toMatch(/reconnectionHandler/);
+    expect(content).toMatch(/createReconnectionError/);
+  });
+
+  test('Configuração deve incluir parâmetros de reconexão', () => {
+    const configFile = path.join(__dirname, '..', 'config', 'index.js');
+    const content = fs.readFileSync(configFile, 'utf-8');
+    
+    // Verifica se tem configurações de timeout e retry
+    expect(content).toMatch(/requestTimeout/);
+    expect(content).toMatch(/azureSqlReconnectRetrySeconds/);
+  });
 });
