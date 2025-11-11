@@ -710,6 +710,56 @@ npm run dev
 
 **Nota:** O frontend requer Node.js v20 ou superior. O arquivo `.nvmrc` está configurado para garantir compatibilidade.
 
+## 🔄 Reconexão Automática do Azure SQL
+
+O sistema implementa reconexão automática quando o Azure SQL desconecta por inatividade, proporcionando uma experiência de usuário melhor:
+
+### Funcionalidades
+
+- **Auto-Reconnect**: Detecta desconexões e reconecta automaticamente
+- **User-Friendly Errors**: Mensagens claras durante reconexão
+- **Retry Logic**: Tenta reconectar até 3 vezes com backoff exponencial
+- **Timeout Configurável**: Ajuste via variáveis de ambiente
+
+### Como Funciona
+
+1. **Azure SQL desconecta** após período de inatividade
+2. **micro-azure detecta** a desconexão na próxima requisição
+3. **Tenta reconectar** automaticamente em background
+4. **Se demorar muito**: Retorna erro especial `AZURE_SQL_RECONNECTING` com status 503
+5. **BFF repassa** o erro para o frontend
+6. **Frontend exibe** mensagem amigável com countdown e botão de retry
+
+### Mensagem no Frontend
+
+Quando o banco está reconectando, o usuário vê:
+
+```
+╔══════════════════════════════════════╗
+║  🔄 Reconectando ao Banco de Dados  ║
+╠══════════════════════════════════════╣
+║  O banco de dados está reconectan-  ║
+║  do. Por favor, aguarde ou tente    ║
+║  novamente em alguns instantes.     ║
+║                                      ║
+║  Tentativa automática em 15s        ║
+║  [ Tentar Agora ]                   ║
+╚══════════════════════════════════════╝
+```
+
+### Configuração
+
+```env
+# micro-azure
+REQUEST_TIMEOUT=15000  # Timeout para operações (15s)
+AZURE_SQL_RECONNECT_RETRY_SECONDS=15  # Tempo sugerido para retry
+
+# micro-bff
+REQUEST_TIMEOUT=15000  # Deve ser >= micro-azure
+```
+
+**Importante**: O timeout do BFF deve ser maior ou igual ao do micro-azure para evitar timeouts prematuros.
+
 ## ✅ Testes
 
 ### Testar Health Checks
@@ -734,6 +784,7 @@ curl http://localhost:7072/api/produtos-auditoria
 ```env
 PORT=3000
 NODE_ENV=production
+REQUEST_TIMEOUT=15000
 USER_SERVICE_URL=https://levaja-micro-azure.azurewebsites.net
 PRODUCT_SERVICE_URL=https://levaja-micro-mongo.azurewebsites.net
 CORS_ORIGIN=https://seu-frontend.azurewebsites.net
@@ -752,6 +803,9 @@ AZURE_SQL_SERVER=levaja-sql-server.database.windows.net
 AZURE_SQL_DATABASE=levaja-usuarios-db
 AZURE_SQL_USER=sqladmin
 AZURE_SQL_PASSWORD=SuaSenhaForte123!
+# Configurações de Reconexão
+AZURE_SQL_RECONNECT_RETRY_SECONDS=15
+REQUEST_TIMEOUT=15000
 ```
 
 ### micro-mongo

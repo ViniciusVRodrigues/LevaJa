@@ -35,8 +35,27 @@ AZURE_SQL_DATABASE=levaja-users
 AZURE_SQL_USER=sqladmin
 AZURE_SQL_PASSWORD=YourStrongPassword123!
 AZURE_SQL_ENCRYPT=true
+
+# Configurações de Reconexão Azure SQL
+# Tempo de espera sugerido ao usuário quando o banco está reconectando (em segundos)
+AZURE_SQL_RECONNECT_RETRY_SECONDS=15
+# Timeout para requisições (em milissegundos) - deve ser maior que o tempo de reconexão
+REQUEST_TIMEOUT=15000
+
 CORS_ORIGIN=http://localhost:3000
 ```
+
+### Variáveis de Ambiente
+
+- `PORT`: Porta do servidor (padrão: 3001)
+- `AZURE_SQL_SERVER`: Endereço do servidor Azure SQL
+- `AZURE_SQL_DATABASE`: Nome do banco de dados
+- `AZURE_SQL_USER`: Usuário do banco
+- `AZURE_SQL_PASSWORD`: Senha do banco
+- `AZURE_SQL_ENCRYPT`: Habilita SSL/TLS (padrão: true)
+- `AZURE_SQL_RECONNECT_RETRY_SECONDS`: Tempo sugerido para retry quando reconectando (padrão: 15s)
+- `REQUEST_TIMEOUT`: Timeout para operações de banco em milissegundos (padrão: 15000ms)
+- `CORS_ORIGIN`: Origem permitida para CORS
 
 ### Azure SQL Server
 
@@ -44,6 +63,33 @@ CORS_ORIGIN=http://localhost:3000
 2. Crie um banco de dados chamado `levaja-users`
 3. Configure firewall para permitir conexões
 4. Obtenha as credenciais de conexão
+
+## Reconexão Automática do Azure SQL
+
+Este microserviço implementa reconexão automática quando o Azure SQL desconecta por inatividade. 
+
+### Como Funciona
+
+1. **Lazy Connection**: Conexão é estabelecida sob demanda (não no startup)
+2. **Auto-Reconnect**: Detecta desconexões e reconecta automaticamente
+3. **Retry Logic**: Tenta reconectar até 3 vezes com backoff exponencial
+4. **User-Friendly Errors**: Retorna erro especial durante reconexão
+
+### Erro de Reconexão
+
+Quando o banco está reconectando e não consegue completar no tempo limite, retorna:
+
+```json
+{
+  "error": "AZURE_SQL_RECONNECTING",
+  "retryIn": 15,
+  "message": "O banco de dados está reconectando, tente novamente em alguns instantes."
+}
+```
+
+Status HTTP: `503 Service Unavailable`
+
+Este erro é capturado pelo BFF e frontend, exibindo uma mensagem amigável ao usuário.
 
 ## Execução
 
@@ -168,8 +214,31 @@ Error: Failed to connect to Azure SQL
 ```
 Error: Request timeout
 ```
-- Aumente timeout na configuração
+- Aumente timeout na configuração (`REQUEST_TIMEOUT` no .env)
 - Verifique rede/firewall
+- Verifique se o Azure SQL está ativo
+
+### Reconexão do Azure SQL
+
+Se você ver logs como:
+```
+🔄 Pool não disponível. Conectando...
+🔄 Conectando ao Azure SQL Server... (tentativa 1/4)
+```
+
+Isso é normal. O Azure SQL desconecta automaticamente após inatividade. O microserviço irá:
+1. Detectar a desconexão
+2. Tentar reconectar automaticamente
+3. Se demorar mais que o timeout, retornar erro `AZURE_SQL_RECONNECTING` para o cliente
+4. O frontend exibirá mensagem amigável com sugestão de retry
+
+**Configurações recomendadas para ambientes de produção:**
+- `REQUEST_TIMEOUT=15000` (15 segundos)
+- `AZURE_SQL_RECONNECT_RETRY_SECONDS=15`
+
+**Para desenvolvimento/teste:**
+- Mantenha os valores padrão
+- Se necessário, aumente o timeout para evitar erros durante debug
 
 ## Deploy no Azure
 
