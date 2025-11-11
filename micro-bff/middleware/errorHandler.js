@@ -44,7 +44,7 @@ const errorHandler = (err, req, res, next) => {
     }
   } else if (err.request) {
     statusCode = 503;
-    message = 'Serviço indisponível no momento';
+    message = 'Serviço indisponível no momento, tente novamente em alguns instantes';
     code = 'SERVICE_UNAVAILABLE';
   }
 
