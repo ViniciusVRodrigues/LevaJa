@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { userService } from '../../services/userService';
 import Loading from '../../components/Loading';
+import ReconnectionAlert from '../../components/ReconnectionAlert';
 import './UserForm.css';
 
 function UserForm() {
@@ -11,6 +12,7 @@ function UserForm() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [reconnecting, setReconnecting] = useState({ show: false, retryIn: 15, message: '' });
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -26,6 +28,7 @@ function UserForm() {
   const loadUser = async () => {
     try {
       setLoading(true);
+      setReconnecting({ show: false, retryIn: 15, message: '' });
       const data = await userService.getById(id);
       setFormData({
         nome: data.nome || '',
@@ -33,7 +36,17 @@ function UserForm() {
         senha: '' // Não carregar senha por segurança
       });
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao carregar usuário');
+      // Check if it's a reconnection error
+      if (err.isReconnecting) {
+        setReconnecting({
+          show: true,
+          retryIn: err.retryIn || 15,
+          message: err.message
+        });
+        setError(null);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Erro ao carregar usuário');
+      }
     } finally {
       setLoading(false);
     }
@@ -50,6 +63,7 @@ function UserForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setReconnecting({ show: false, retryIn: 15, message: '' });
 
     // Validações
     if (!formData.nome || formData.nome.length < 3) {
@@ -78,9 +92,28 @@ function UserForm() {
       }
       navigate('/usuarios');
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao salvar usuário');
+      // Check if it's a reconnection error
+      if (err.isReconnecting) {
+        setReconnecting({
+          show: true,
+          retryIn: err.retryIn || 15,
+          message: err.message
+        });
+        setError(null);
+      } else {
+        setError(err.response?.data?.message || err.message || 'Erro ao salvar usuário');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (isEdit) {
+      loadUser();
+    } else {
+      // For create form, just clear the reconnection alert
+      setReconnecting({ show: false, retryIn: 15, message: '' });
     }
   };
 
@@ -88,6 +121,13 @@ function UserForm() {
 
   return (
     <div className="page-container">
+      <ReconnectionAlert
+        show={reconnecting.show}
+        retryIn={reconnecting.retryIn}
+        message={reconnecting.message}
+        onRetry={handleRetry}
+      />
+      
       <div className="page-header">
         <h1>{isEdit ? 'Editar Usuário' : 'Novo Usuário'}</h1>
       </div>
